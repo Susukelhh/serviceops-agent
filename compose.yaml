@@ -1,0 +1,209 @@
+# Compose 在本机启动网关、两个 Agent API、一次性迁移任务和共享 PostgreSQL。
+name: serviceops-agent
+
+# 两个 Agent 实例共用的环境变量只定义一次，避免复制后悄悄产生配置差异。
+x-agent-environment: &agent-environment
+  # 容器内项目根目录用于定位种子知识库等只读资源。
+  SERVICEOPS_PROJECT_ROOT: /app
+  # 当前 Compose 面向本地学习与验收，不假装成真实生产环境。
+  SERVICEOPS_ENVIRONMENT: development
+  # 默认使用零费用、可重复的模拟模型，启动容器不会消耗千问额度。
+  SERVICEOPS_LLM_BACKEND: mock
+  # 确定性规划器使回归测试每次得到相同的路由结果。
+  SERVICEOPS_AGENT_PLANNER_BACKEND: deterministic
+  # 哈希向量与抽取式回答让本地 RAG 不依赖外部模型。
+  SERVICEOPS_EMBEDDING_BACKEND: hash
+  SERVICEOPS_RAG_GENERATION_BACKEND: extractive
+  # Qdrant 仍用于当前单次进程内的知识检索演示；业务状态统一进入 PostgreSQL。
+  SERVICEOPS_QDRANT_LOCATION: ":memory:"
+  # 显式选择 PostgreSQL，禁止 API 悄悄退回 SQLite 或纯内存。
+  SERVICEOPS_PERSISTENCE_BACKEND: postgres
+  # postgres 是 Compose 私有网络中的服务名，不是 Windows 的 localhost。
+  SERVICEOPS_POSTGRES_DSN: >-
+    postgresql://serviceops:${SERVICEOPS_POSTGRES_PASSWORD:-serviceops-local-dev-password}@postgres:5432/serviceops
+  # 每个实例最多保留 5 个连接；两个实例合计上限约为 10 个业务连接。
+  SERVICEOPS_POSTGRES_POOL_MIN_SIZE: 1
+  SERVICEOPS_POSTGRES_POOL_MAX_SIZE: 5
+  # 每只 Agent 最多同时执行 8 个业务请求；两只实例合计约 16 个工位。
+  SERVICEOPS_AGENT_MAX_IN_FLIGHT_REQUESTS: 8
+  # 工位全部占用时快速失败，避免请求在容器内无限堆积并最终一起超时。
+  SERVICEOPS_AGENT_CAPACITY_QUEUE_TIMEOUT_SECONDS: 0.05
+  # 本地验收关闭外部遥测，避免把测试内容发送到第三方。
+  SERVICEOPS_TELEMETRY_ENABLED: "false"
+
+# 两个 Agent API 共用的容器规则定义成模板；agent-a、agent-b 只覆盖实例编号。
+x-agent-service: &agent-service
+  # 两个实例必须来自完全相同的代码镜像，差别只应来自配置。
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: serviceops-agent:local
+  # 与 Dockerfile 中创建的非 root 用户一致。
+  user: "10001:10001"
+  # expose 只把 8000 端口告知 Compose 内部网络，不直接暴露给 Windows。
+  expose:
+    - "8000"
+  # API 必须等待数据库健康并且 Alembic 迁移成功，才允许启动。
+  depends_on:
+    postgres:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+  # 只读根文件系统限制运行中的程序修改镜像内容。
+  read_only: true
+  # 必要的短期临时文件只写到受限内存，不污染镜像层。
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  # init 转发关闭信号并回收孤儿子进程。
+  init: true
+  # Docker Desktop 重启后自动恢复服务；人工停止后保持停止。
+  restart: unless-stopped
+  # 应用不需要 Linux 特权，全部删除并禁止重新获得权限。
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  # 本地资源边界防止异常循环拖慢整台电脑。
+  pids_limit: 256
+  mem_limit: 2g
+  cpus: 1.5
+  # 探针访问真正的 readiness 接口，而不是只判断 Python 进程还活着。
+  healthcheck:
+    test:
+      - CMD
+      - python
+      - -c
+      - >-
+        import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3); raise SystemExit(0 if r.status == 200 else 1)
+    interval: 15s
+    timeout: 5s
+    start_period: 20s
+    retries: 3
+  # FastAPI 有时间关闭 Checkpointer、连接池和遥测资源。
+  stop_grace_period: 30s
+
+services:
+  # gateway 是用户唯一能访问的入口，负责把请求轮流转给两个 Agent 实例。
+  gateway:
+    # 固定 Nginx 补丁版本和镜像摘要，避免未来 latest 被静默替换。
+    image: nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
+    # 绕过官方镜像会写配置文件的启动脚本，使只读文件系统仍可工作。
+    entrypoint: ["nginx"]
+    command: ["-g", "daemon off;"]
+    # 使用官方 Alpine Nginx 镜像内置的低权限 nginx 用户。
+    user: "101:101"
+    # Windows 仍访问 localhost:8000，但这个端口现在属于网关而不是某只 Agent。
+    ports:
+      - "127.0.0.1:8000:8080"
+    # 两个后端都健康后才启动入口，减少刚启动时出现 502 的概率。
+    depends_on:
+      agent-a:
+        condition: service_healthy
+      agent-b:
+        condition: service_healthy
+    # 网关配置由仓库管理，并以只读方式挂入容器。
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 0.5
+    # 网关探针必须成功穿过 Nginx 并到达某个后端的 readiness 接口。
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --spider
+        - http://127.0.0.1:8080/ready
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    stop_grace_period: 15s
+
+  # 第一只 Agent；业务代码、模型配置和数据库都与第二只完全一致。
+  agent-a:
+    <<: *agent-service
+    environment:
+      <<: *agent-environment
+      # 响应头会带回该值，方便证明这次请求由哪只实例处理。
+      SERVICEOPS_INSTANCE_ID: agent-a
+
+  # 第二只 Agent；它能接续 agent-a 创建的 thread，因为状态位于共享 PostgreSQL。
+  agent-b:
+    <<: *agent-service
+    environment:
+      <<: *agent-environment
+      SERVICEOPS_INSTANCE_ID: agent-b
+
+  # migrate 是一次性“装修队”：先升级表结构，完成后退出，不长期占用资源。
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: serviceops-agent:local
+    # 只执行 Alembic upgrade head；退出码 0 才允许两只 API 启动。
+    command: ["python", "-m", "serviceops_agent.infrastructure.migrate"]
+    user: "10001:10001"
+    environment:
+      <<: *agent-environment
+      SERVICEOPS_INSTANCE_ID: migration
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    init: true
+    # 迁移成功退出是正常状态，不应该被 Docker 反复重启。
+    restart: "no"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 0.5
+
+  # PostgreSQL 是多个 Agent 共用的“总档案室”。
+  postgres:
+    # 固定主版本、补丁版本和摘要，避免无提示升级导致数据目录不兼容。
+    image: postgres:18.4-bookworm@sha256:882236b897e39051d2368c5ccc6cda944904723506b2dfc97f2a8f5bc9afa382
+    environment:
+      POSTGRES_DB: serviceops
+      POSTGRES_USER: serviceops
+      # 默认密码只供本机课程；真实部署必须由 Secret 管理系统覆盖。
+      POSTGRES_PASSWORD: ${SERVICEOPS_POSTGRES_PASSWORD:-serviceops-local-dev-password}
+    # 数据库只在 Compose 私有网络开放，不向 Windows 映射 5432。
+    expose:
+      - "5432"
+    # 具名卷与容器生命周期分离，重建数据库容器也不会自动删除数据。
+    volumes:
+      - serviceops-postgres:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U serviceops -d serviceops
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: 1.0
+    # 收到停止信号后留出完成检查点和安全落盘的时间。
+    stop_grace_period: 30s
+
+# PostgreSQL 数据卷由 Docker 管理；docker compose down 不会删除它，down -v 才会删除。
+volumes:
+  serviceops-postgres:

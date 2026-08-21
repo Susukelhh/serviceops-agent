@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第十一课：备份不是复制文件</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#60697a; --blue:#2859d8; --green:#117861; --orange:#bd5b19; --line:#dfe4eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#edf7ff,#fff8ee 54%,#e9fbf4); color:var(--ink); font:17px/1.73 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(980px,calc(100% - 30px)); margin:32px auto; padding:clamp(23px,5vw,56px); background:rgba(255,255,255,.97); border:1px solid var(--line); border-radius:22px; box-shadow:0 20px 65px rgba(31,52,91,.12); }
+    h1 { margin:.15em 0 .35em; font:800 clamp(34px,6vw,55px)/1.12 Georgia,"Songti SC",serif; letter-spacing:-.035em; }
+    h2 { margin:2em 0 .55em; font-size:1.42rem; }
+    h3 { color:var(--blue); }
+    .eyebrow { color:var(--blue); font-weight:780; letter-spacing:.08em; }
+    .lead { color:var(--muted); font-size:1.12rem; }
+    .answer { background:#edf9f4; border-left:5px solid var(--green); border-radius:10px; padding:16px 20px; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; margin:20px 0; }
+    .card { padding:19px; border:1px solid var(--line); border-radius:16px; background:#fffdfa; }
+    .card h3 { margin:0 0 8px; }
+    code { background:#eef2f7; border-radius:6px; padding:.12em .4em; }
+    pre { overflow:auto; background:#111827; color:#f1f5ff; border-radius:14px; padding:18px; line-height:1.6; }
+    .warn { background:#fff4e8; border-left:5px solid var(--orange); border-radius:10px; padding:16px 20px; }
+    .interview { background:#f0f5ff; border:1px solid #ccd9fb; border-radius:14px; padding:18px; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:11px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    nav { display:flex; flex-wrap:wrap; gap:16px; margin-top:32px; padding-top:18px; border-top:1px solid var(--line); }
+    a { color:var(--blue); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:760px) { .grid { grid-template-columns:1fr; } main { margin:14px auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 第 19 步配套课</div>
+  <h1>档案柜拍了照片，为什么还要试着重建一次？</h1>
+  <p class="lead">备份文件存在，不代表出事时一定能用。这一课用“档案打包、封条指纹和临时档案室”理解逻辑备份、SHA-256与恢复演练。</p>
+
+  <div class="answer"><strong>先记住结论：</strong>没有恢复过的备份，只是一份“希望能用”的文件；成功恢复并核对过，才是一份有验证证据的备份。</div>
+
+  <h2>项目到底做了什么</h2>
+  <pre><code>正在使用的 serviceops 档案室
+  ↓ pg_dump，只读打包
+serviceops_时间_随机值.dump
+  ↓ SHA-256 封条 + pg_restore 可读检查
+随机临时档案室
+  ↓ 恢复全部表、数据、索引和触发器
+逐表核对：表名、行数、内容指纹
+  ↓
+核对通过 → 删除临时档案室，保留备份与清单</code></pre>
+
+  <div class="grid">
+    <section class="card"><h3>pg_dump</h3><p>数据库专用打包员，把某个时刻的表结构和数据整理成归档。</p></section>
+    <section class="card"><h3>SHA-256</h3><p>给整个备份算一串文件指纹。文件哪怕改一个字节，结果也会不同。</p></section>
+    <section class="card"><h3>pg_restore</h3><p>数据库专用还原员。它实际读归档、建表、写回数据和恢复约束。</p></section>
+  </div>
+
+  <h2>为什么临时库名字限制得很死</h2>
+  <p>恢复演练最后需要删除临时库。为了防止程序把真实业务库删掉，代码只接受形如
+  <code>serviceops_restore_drill_123456789abc</code> 的内部随机名字。真实 <code>serviceops</code>、手工名字、
+  带额外字符的名字全部会在执行命令前被拒绝。</p>
+
+  <div class="warn"><strong>重要：</strong><code>data/backups</code> 中的 dump 可能含订单、审计和对话状态。它不是普通项目文件，不能提交 Git、传公开网盘或发给没有数据权限的人。</div>
+
+  <h2>我们实际验证了什么</h2>
+  <table>
+    <thead><tr><th>检查</th><th>本机结果</th></tr></thead>
+    <tbody>
+      <tr><td>归档可被 pg_restore 读取</td><td>36 个归档对象</td></tr>
+      <tr><td>恢复后的表</td><td>8 张公共表全部一致</td></tr>
+      <tr><td>备份文件</td><td>160047 bytes</td></tr>
+      <tr><td>临时库清理</td><td>已删除，没有残留</td></tr>
+      <tr><td>整个演练</td><td>约 10.5 秒</td></tr>
+    </tbody>
+  </table>
+  <pre><code>uv run python examples/19_postgres_backup_restore_drill.py</code></pre>
+
+  <h2>备份、高可用、PITR不是一回事</h2>
+  <ul>
+    <li><strong>本步逻辑备份：</strong>像每天打一个压缩档案，适合迁移和灾难恢复。</li>
+    <li><strong>高可用：</strong>主档案室坏了，备用档案室快速接班，重点是少停机。</li>
+    <li><strong>PITR：</strong>持续记录每次变化，可以恢复到误删除之前的具体时间点。</li>
+  </ul>
+  <p><small>当前求职阶段要能解释并演示逻辑备份；高可用和PITR先理解概念与差异，不需要现在自己搭完整集群。</small></p>
+
+  <h2>面试时怎么说</h2>
+  <div class="interview"><strong>可直接回答：</strong>“我没有把Docker具名卷当成备份，而是用pg_dump custom格式生成逻辑归档，先写partial再原子改名，并保存SHA-256和有限数据指纹。随后恢复到代码内部生成的随机临时库，用单事务和遇错即停保证不会留下半套结构，再比较全部公共表的集合、行数和内容哈希。真实业务库不能成为恢复或删除目标，异常路径也会在finally清理临时库。本机8张表恢复一致，但我不会把它描述成高可用或PITR。”</div>
+
+  <nav>
+    <a href="0010-load-shedding-in-plain-chinese.html">← 上一课：限流与过载保护</a>
+    <a href="../examples/19_postgres_backup_restore_drill.py">查看：第19步恢复脚本</a>
+    <a href="../docs/steps/19-postgresql-backup-and-restore-drill.md">阅读：完整实施记录</a>
+    <a href="0012-agent-console-in-plain-chinese.html">下一课：Agent 控制台 →</a>
+  </nav>
+</main>
+</body>
+</html>

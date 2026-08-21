@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第十三课：Checkpoint 到底保存了什么</title>
+  <style>
+    :root { color-scheme:light; --ink:#17251f; --muted:#63716a; --green:#19865f; --deep:#10271f; --amber:#b76b16; --line:#d8e1dc; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(145deg,#edf5f0,#fff8eb 58%,#eef3fb); font:17px/1.72 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(980px,calc(100% - 30px)); margin:32px auto; padding:clamp(23px,5vw,56px); border:1px solid var(--line); border-radius:22px; background:rgba(255,255,255,.97); box-shadow:0 20px 65px rgba(24,48,37,.12); }
+    h1 { margin:.15em 0 .35em; font:800 clamp(34px,6vw,55px)/1.12 Georgia,"Songti SC",serif; letter-spacing:-.035em; }
+    h2 { margin:2em 0 .55em; font-size:1.42rem; }
+    .eyebrow { color:var(--green); font-weight:780; letter-spacing:.08em; }
+    .lead { color:var(--muted); font-size:1.12rem; }
+    .answer { padding:16px 20px; border-left:5px solid var(--green); border-radius:10px; background:#eaf7f1; }
+    .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:22px 0; }
+    .step { position:relative; padding:17px; border:1px solid var(--line); border-radius:14px; background:#fffdfa; }
+    .step b { display:block; color:var(--green); }
+    .step small { color:var(--muted); }
+    pre { overflow:auto; padding:18px; border-radius:14px; color:#f0f8f4; background:var(--deep); line-height:1.6; }
+    code { padding:.12em .4em; border-radius:6px; background:#eef2ef; }
+    .warn { padding:16px 20px; border-left:5px solid var(--amber); border-radius:10px; background:#fff3df; }
+    .practice { padding:18px; border:1px solid #cbd9d2; border-radius:14px; background:#f0f7f3; }
+    details { margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    summary { cursor:pointer; font-weight:700; }
+    nav { display:flex; flex-wrap:wrap; gap:16px; margin-top:32px; padding-top:18px; border-top:1px solid var(--line); }
+    a { color:var(--green); text-underline-offset:3px; }
+    @media (max-width:760px) { .flow { grid-template-columns:1fr 1fr; } main { margin:14px auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 第 20.1 步配套课</div>
+  <h1>Checkpoint 就是工单走完一站后的“快照”</h1>
+  <p class="lead">它不是模型脑内想法，而是系统在一个 super-step 结束时，真实保存的 State、下一节点和执行元数据。</p>
+
+  <div class="answer"><strong>先记住结论：</strong>State 是当前工单，Checkpoint 是工单在某一时刻的照片，thread_id 是装这组照片的档案袋编号。</div>
+
+  <h2>一次订单查询会留下什么</h2>
+  <div class="flow">
+    <section class="step"><b>C1 输入</b><small>下一步：__start__</small></section>
+    <section class="step"><b>C2 规范化</b><small>新增 normalized_message</small></section>
+    <section class="step"><b>C3 分类</b><small>新增 intent 与置信度</small></section>
+    <section class="step"><b>后续快照</b><small>计划 → 工具 → 观察 → 回答</small></section>
+  </div>
+
+  <pre><code>StateSnapshot(
+  values={...当前全部 State...},
+  next=("execute_order_tool",),
+  config={"configurable": {"thread_id": "...", "checkpoint_id": "..."}},
+  metadata={"source": "loop", "step": 4},
+  tasks=(...),
+  interrupts=()
+)</code></pre>
+
+  <h2>为什么暂停后还能继续</h2>
+  <p>退货图运行到 <code>interrupt</code> 时，Checkpointer 已经保存草案、流程阶段和下一任务。审批接口只要带回同一个
+  <code>thread_id</code>，LangGraph 就能取出最近快照，再用 <code>Command.resume</code> 继续。它像主管签完字后把原工单放回同一条流水线，而不是重新填一张。</p>
+
+  <div class="warn"><strong>一个容易答错的面试点：</strong>Checkpoint 在 super-step 边界创建。顺序图常表现为一个节点后一个快照；并行 fan-out 中，一个 super-step 可以同时执行多个节点，不能死记成“一节点必等于一快照”。</div>
+
+  <h2>现在动手观察</h2>
+  <div class="practice">
+    <ol>
+      <li>在控制台配置 customer 与 developer Token。</li>
+      <li>运行“查询订单 SO100001 到哪了”。</li>
+      <li>在教学调试模式从 C1 开始点“下一步”。</li>
+      <li>找出 <code>intent</code>、<code>planned_tool_call</code>、<code>tool_result</code> 和 <code>answer</code> 分别在哪一步首次出现。</li>
+    </ol>
+    <details><summary>回忆题：State 和 Checkpoint 有什么区别？</summary><p>State 是当前正在流转的整张工作单；Checkpoint 是某个 super-step 结束时保存的 StateSnapshot，可用于查看历史、恢复、重放和排错。</p></details>
+    <details><summary>回忆题：页面为何要用 developer Token？</summary><p>状态历史比普通回答包含更多内部结构，所以用独立 debug:read 权限隔离；生产环境还会直接关闭接口。</p></details>
+  </div>
+
+  <h2>面试时用一句话说明</h2>
+  <div class="answer">“我通过 LangGraph 的 aget_state_history 读取 StateSnapshot，不直接耦合 Checkpoint 数据库私有表；后端按字段白名单脱敏并计算相邻快照差异，前端按时间顺序单步回放。interrupt 快照能证明写工具前已经暂停，Command.resume 后的新快照会接在原 thread_id 历史之后。”</div>
+
+  <p>推荐一手资料：<a href="https://docs.langchain.com/oss/python/langgraph/persistence">LangGraph Persistence 官方文档</a>。如果 StateSnapshot、super-step 或 interrupt 仍不清楚，直接继续问我并指出你卡在哪个页面步骤。</p>
+
+  <nav>
+    <a href="0012-agent-console-in-plain-chinese.html">← 上一课：Agent 控制台</a>
+    <a href="http://127.0.0.1:8000/console/">动手：Checkpoint 播放器</a>
+    <a href="../reference/langgraph-checkpoint-debugging.html">速查：Checkpoint 字段</a>
+    <a href="../docs/steps/20-1-checkpoint-teaching-debugger.md">阅读：完整实施记录</a>
+  </nav>
+</main>
+</body>
+</html>

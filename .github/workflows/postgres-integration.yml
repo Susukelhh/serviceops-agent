@@ -1,0 +1,87 @@
+# 该工作流使用临时 PostgreSQL 服务验证真实驱动、SQL、事务和跨运行时恢复。
+name: ServiceOps PostgreSQL integration gate
+
+# 普通提交和 Pull Request 都可运行；本工作流使用公开本地测试密码，不读取任何 Secret。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 测试只需读取仓库；GITHUB_TOKEN 不获得写代码、Issue 或部署权限。
+permissions:
+  contents: read
+
+# 同一分支新提交会取消旧测试，节约 Runner 与镜像下载时间。
+concurrency:
+  group: postgres-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-runtime:
+    # Job 名称可作为分支保护中的独立必需检查。
+    name: PostgreSQL restart, business and outbox integration
+    # Ubuntu Runner 能运行官方 PostgreSQL Linux 容器。
+    runs-on: ubuntu-latest
+    # 数据库镜像或依赖异常时不能无限占用 Runner。
+    timeout-minutes: 20
+    # GitHub Actions 为当前 Job 创建一只临时数据库，Job 结束后自动销毁。
+    services:
+      postgres:
+        # 与本地 Compose 使用相同补丁标签和不可变镜像摘要。
+        image: postgres:18.4-bookworm@sha256:882236b897e39051d2368c5ccc6cda944904723506b2dfc97f2a8f5bc9afa382
+        # 这些值只存在于一次性 CI 数据库，不是任何真实环境凭证。
+        env:
+          POSTGRES_DB: serviceops_test
+          POSTGRES_USER: serviceops_test
+          POSTGRES_PASSWORD: serviceops-ci-local-password
+        # 映射只存在于隔离 Runner 生命周期，供 pytest 连接临时数据库。
+        ports:
+          - 5432:5432
+        # Runner 等待 pg_isready 成功后才执行 Python 测试。
+        options: >-
+          --health-cmd "pg_isready -U serviceops_test -d serviceops_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # 所有模型/RAG 后端固定离线；唯一网络依赖是当前 Runner 内的临时 PostgreSQL。
+    env:
+      PYTHONUTF8: "1"
+      PYTHONUNBUFFERED: "1"
+      SERVICEOPS_ENVIRONMENT: test
+      SERVICEOPS_LLM_BACKEND: mock
+      SERVICEOPS_AGENT_PLANNER_BACKEND: deterministic
+      SERVICEOPS_EMBEDDING_BACKEND: hash
+      SERVICEOPS_RAG_GENERATION_BACKEND: extractive
+      SERVICEOPS_QDRANT_LOCATION: ":memory:"
+      SERVICEOPS_TELEMETRY_ENABLED: "false"
+      # 专用变量名是测试文件唯一会读取的 DSN，不会误用应用部署连接地址。
+      SERVICEOPS_TEST_POSTGRES_DSN: postgresql://serviceops_test:serviceops-ci-local-password@127.0.0.1:5432/serviceops_test
+
+    steps:
+      # Action 固定完整提交 SHA，并禁止把临时 Git 凭据留给后续测试代码。
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # uv Action 固定完整提交 SHA和版本，并按锁文件缓存依赖。
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # 与项目 .python-version 一致，避免 CI 使用 Runner 预装的其他解释器。
+      - name: Install pinned Python
+        run: uv python install 3.12
+
+      # --frozen 保证测试不能临时改写锁文件或解析未评审依赖。
+      - name: Sync locked dependencies
+        run: uv sync --frozen --all-groups
+
+      # 本文件会创建三套独立运行时，覆盖 Checkpoint、业务写入、JSONB 过滤和 Outbox 行锁。
+      - name: Run real PostgreSQL integration test
+        run: uv run --frozen pytest tests/integration/test_postgres_runtime.py -q

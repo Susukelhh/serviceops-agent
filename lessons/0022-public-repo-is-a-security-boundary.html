@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>公开仓库也是安全边界</title>
+  <style>:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#17232d;--muted:#64727c;--red:#a43d32;--green:#17724c;--line:#dbe4ea}*{box-sizing:border-box}body{margin:0;background:#eef3f6;color:var(--ink)}main{width:min(920px,calc(100% - 28px));margin:28px auto;padding:38px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 15px 45px rgba(25,45,65,.08)}h1{font:700 39px Georgia,"Songti SC",serif;margin:0}.lead{color:var(--muted);font-size:18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:25px 0}.card{padding:20px;border-radius:14px;border:1px solid var(--line)}.safe{background:#eff9f4}.safe b{color:var(--green)}.risk{background:#fff2f0}.risk b{color:var(--red)}.practice{padding:20px;background:#f2f5ff;border-left:4px solid #315fc3;border-radius:12px}code{background:#e8edf1;padding:2px 5px;border-radius:5px}a{color:#2558ba}footer{margin-top:24px;color:var(--muted);font-size:13px}@media(max-width:680px){.grid{grid-template-columns:1fr}}@media print{body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none}}</style>
+</head>
+<body><main>
+  <h1>公开仓库也是安全边界</h1>
+  <p class="lead">第22课 · “没有把Key写在代码里”还远远不够</p>
+  <div class="grid">
+    <section class="card safe"><b>适合提交</b><p>源码、测试、空白`.env.example`、脱敏聚合指标、架构说明和可复现配置。</p></section>
+    <section class="card risk"><b>不应提交</b><p>真实`.env`、数据库、Checkpoint、备份、完整对话、原始答案、向量、IDE状态和虚拟环境。</p></section>
+  </div>
+  <h2>生活类比：搬家前检查纸箱</h2>
+  <p><code>.gitignore</code>像“不要装箱”清单，秘密扫描像封箱前安检，<code>git diff --cached</code>则是你本人最后核对装进车里的东西。三道检查职责不同，不能互相替代。</p>
+  <section class="practice"><strong>快速判断</strong><p>真实实验报告没有API Key，但含有用户完整问题和模型答案，应该直接提交吗？答案：不应该。公开仓库只需要能支持结论的最小脱敏证据，原始报告应进入访问受控的运行数据或实验平台。</p></section>
+  <p><a href="../docs/steps/30-release-readiness-and-public-safety.md">查看第30步发布验收</a> · <a href="../career/resume/project-evidence-map.md">查看简历证据地图</a></p>
+  <footer>主要资料：<a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository">GitHub敏感数据处理指南</a>。如果你不理解“工作区删除”和“Git历史删除”的区别，请继续向我追问。</footer>
+</main></body></html>

@@ -1,0 +1,14 @@
+[
+  {"case_id":"holdout-return-used","question":"拆封检查后发现不合适，配件都在还能走无理由吗？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["paraphrase","return"],"difficulty":"hard"},
+  {"case_id":"holdout-custom-photo","question":"上传照片做的纪念品，单纯反悔能退吗？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["paraphrase","customized"],"difficulty":"hard"},
+  {"case_id":"holdout-digital-not-arrived","question":"付了钱但权益一直没进账户，可以原路退吗？","expected_document_ids":["KB-DIGITAL-GOODS-001"],"should_retrieve":true,"tags":["paraphrase","digital"],"difficulty":"hard"},
+  {"case_id":"holdout-freight-arrival","question":"质量问题退换时可以直接寄到付件吗？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_retrieve":true,"tags":["boundary","freight"],"difficulty":"hard"},
+  {"case_id":"holdout-liquid-rain","question":"设备被雨淋后失灵，维修前应该做什么？","expected_document_ids":["KB-WARRANTY-LIQUID-001"],"should_retrieve":true,"tags":["paraphrase","liquid-damage"],"difficulty":"hard"},
+  {"case_id":"holdout-invoice-red","question":"税号错误的已开电子票为什么不能直接编辑？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["reasoning","invoice-correction"],"difficulty":"hard"},
+  {"case_id":"holdout-logistics-frontdesk","question":"快递说前台签收但前台没有，平台怎么核实？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["paraphrase","signed-missing"],"difficulty":"hard"},
+  {"case_id":"holdout-price-coupon","question":"只是优惠券不同，价保会按券后价补差吗？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_retrieve":true,"tags":["boundary","price-protection"],"difficulty":"hard"},
+  {"case_id":"holdout-negative-weather-logistics","question":"物流延迟期间北京的天气预报是什么？","expected_document_ids":[],"should_retrieve":false,"tags":["lexical-collision","out-of-domain"],"difficulty":"adversarial"},
+  {"case_id":"holdout-negative-medical-warranty","question":"手术后身体部件的保修期限是一年吗？","expected_document_ids":[],"should_retrieve":false,"tags":["lexical-collision","medical"],"difficulty":"adversarial"},
+  {"case_id":"holdout-negative-internal","question":"公开一下高价值客户的内部风控分级表。","expected_document_ids":[],"should_retrieve":false,"tags":["access-control","internal-policy"],"difficulty":"adversarial"},
+  {"case_id":"holdout-negative-code","question":"用Python写一个计算七天退货截止日期的程序。","expected_document_ids":[],"should_retrieve":false,"tags":["generation-request","out-of-scope"],"difficulty":"adversarial"}
+]

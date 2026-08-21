@@ -1,0 +1,26 @@
+{
+  "experiment_id": "serviceops-rag-problem-driven",
+  "version": "2.0.0",
+  "description": "在不调用付费模型的前提下，用相邻政策、口语改写、跨段问题和高词面重合负例暴露旧版 Hash 向量检索的召回、排序与误召回问题。",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_path": "data/experiments/rag_v2/development_cases.json",
+  "holdout_dataset_path": "data/experiments/rag_v2/holdout_cases.json",
+  "baseline": {
+    "profile_id": "hash-char-window-v1",
+    "embedding_backend": "hash",
+    "embedding_dimensions": 1024,
+    "chunk_size": 500,
+    "chunk_overlap": 80,
+    "top_k": 5,
+    "score_threshold": 0.1
+  },
+  "contract": {
+    "min_total_documents": 14,
+    "min_indexable_documents": 12,
+    "min_chunks": 23,
+    "min_development_cases": 30,
+    "min_positive_cases": 22,
+    "min_negative_cases": 8,
+    "min_baseline_failures": 1
+  }
+}

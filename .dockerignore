@@ -1,0 +1,46 @@
+# 版本控制元数据和 CI 定义不参与 Python 镜像构建。
+.git/
+.github/
+
+# 本机解释器和 IDE 配置体积大、平台相关，也可能包含个人路径。
+.venv/
+.venv-*/
+.idea/
+.vscode/
+
+# 本地环境变量可能含 API Key 或 JWT 密钥，必须在发送构建上下文前排除。
+.env
+.env.*
+
+# Python、测试、类型检查和覆盖率缓存都可以在目标环境重新生成。
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 构建产物不能作为下一次构建输入，避免把旧 wheel 或元数据误带入镜像。
+build/
+dist/
+*.egg-info/
+
+# SQLite、WAL、评测报告和本地向量索引属于运行状态，必须通过卷在运行时提供。
+data/runtime/
+data/backups/
+
+# 单元测试、示例和学习资料保留在仓库中，但不属于最小运行镜像输入。
+tests/
+examples/
+docs/
+lessons/
+reference/
+learning-records/
+MISSION.md
+NOTES.md
+RESOURCES.md
+
+# 操作系统临时文件没有构建价值。
+.DS_Store
+Thumbs.db

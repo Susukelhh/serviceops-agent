@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据库白话术语表</title>
+  <style>
+    :root { --ink:#182133; --muted:#626b7b; --blue:#2859d8; --line:#dfe4eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f3f6fb; color:var(--ink); font:16px/1.65 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(920px,calc(100% - 28px)); margin:30px auto; padding:clamp(22px,5vw,50px); background:white; border:1px solid var(--line); border-radius:20px; box-shadow:0 18px 55px rgba(35,53,88,.1); }
+    h1 { margin:.1em 0 .35em; font-size:clamp(32px,5vw,48px); }
+    p { color:var(--muted); }
+    table { width:100%; border-collapse:collapse; margin-top:22px; }
+    th,td { padding:13px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--blue); }
+    code { background:#eef2f7; border-radius:5px; padding:.12em .35em; }
+    .rule { margin-top:24px; padding:16px 19px; border-left:5px solid #148064; background:#eef9f5; border-radius:9px; color:var(--ink); }
+    a { color:var(--blue); }
+    @media (max-width:650px) { th:nth-child(3),td:nth-child(3) { display:none; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>数据库白话术语表</h1>
+  <p>先理解用途，暂时不要求记忆 SQL语法。</p>
+  <table>
+    <thead><tr><th>术语</th><th>白话解释</th><th>ServiceOps 示例</th></tr></thead>
+    <tbody>
+      <tr><td>数据库</td><td>按规则长期保存和查找数据的系统</td><td>保存对话进度、退货记录和审批记录</td></tr>
+      <tr><td>表 Table</td><td>一类数据的表格</td><td>“退货申请表”</td></tr>
+      <tr><td>行 Row</td><td>表格中的一条完整记录</td><td>某个用户的一次退货申请</td></tr>
+      <tr><td>列 Column</td><td>每条记录共同拥有的字段</td><td>订单号、状态、创建时间</td></tr>
+      <tr><td>SQLite</td><td>程序直接读写的本地数据库文件</td><td><code>serviceops.sqlite3</code></td></tr>
+      <tr><td>PostgreSQL</td><td>独立运行并接受多个程序连接的数据库服务</td><td>未来让多个 Agent共享状态</td></tr>
+      <tr><td>连接 Connection</td><td>程序和数据库服务建立的通信通道</td><td>Agent通过地址、端口、账号连接 PostgreSQL</td></tr>
+      <tr><td>并发</td><td>多个人或程序在相近时间一起操作</td><td>多个用户同时提交退货请求</td></tr>
+      <tr><td>Checkpoint</td><td>LangGraph执行过程的存档点</td><td>记住对话和人工审批暂停到了哪里</td></tr>
+      <tr><td>共享状态</td><td>多份程序看到同一套最新数据</td><td>Agent A和B都能恢复同一用户对话</td></tr>
+    </tbody>
+  </table>
+  <div class="rule"><strong>最重要的区别：</strong>SQLite更像应用自己的文件抽屉；PostgreSQL更像独立的共享档案服务。选择依据是使用场景，不是名字谁更高级。</div>
+  <p><a href="../lessons/0007-sqlite-vs-postgresql-in-plain-chinese.html">返回：SQLite 与 PostgreSQL 白话课</a></p>
+</main>
+</body>
+</html>

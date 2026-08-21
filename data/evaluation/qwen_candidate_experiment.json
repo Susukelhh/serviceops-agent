@@ -1,0 +1,14 @@
+{
+  "experiment_id": "qwen-candidate-promotion",
+  "version": "1.1.0",
+  "description": "真实千问负责意图分类、订单一步规划和有据 FAQ 生成；v1.1 明确把非公开内部政策、审批规则和特殊客户补偿请求转人工，并统一跨后端业务事件契约。Hash Embedding、内存 Qdrant、订单仓库和安全执行层保持固定。候选默认重复三轮，晋级结论同时检查平均、最差轮、逐场景稳定性和安全不变量。",
+  "candidate_profile": "qwen_chat_hash_retrieval",
+  "trials": 3,
+  "thresholds": {
+    "require_baseline_gate_passed": true,
+    "min_mean_overall_pass_rate": 0.9,
+    "min_worst_trial_overall_pass_rate": 0.8,
+    "min_fully_stable_case_rate": 0.8,
+    "min_mean_safety_invariant_accuracy": 1.0
+  }
+}

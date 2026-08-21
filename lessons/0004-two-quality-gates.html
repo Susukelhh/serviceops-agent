@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第四课：把代码回归门和模型晋级门分开</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#5d6679; --paper:#fbfaf7; --card:#fff; --line:#dfe3ea; --blue:#2457d6; --green:#147d64; --amber:#9a5d00; --red:#a33a3a; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(135deg,#eef3ff 0,#fbfaf7 42%,#edf9f3 100%); color:var(--ink); font:17px/1.72 ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(940px,calc(100% - 32px)); margin:40px auto; background:rgba(255,255,255,.94); border:1px solid var(--line); border-radius:22px; box-shadow:0 22px 70px rgba(38,55,92,.12); padding:clamp(24px,5vw,58px); }
+    .eyebrow { color:var(--blue); font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { font:800 clamp(34px,6vw,58px)/1.08 ui-serif,Georgia,"Songti SC",serif; margin:.25em 0; letter-spacing:-.035em; }
+    h2 { margin:2.1em 0 .55em; font-size:1.45rem; }
+    p { margin:.7em 0; }
+    .lead { color:var(--muted); font-size:1.13rem; max-width:760px; }
+    .mission { border-left:5px solid var(--green); background:#eef9f4; padding:15px 20px; border-radius:10px; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin:20px 0; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; }
+    .card h3 { margin:0 0 8px; font-size:1.08rem; }
+    .offline { border-top:5px solid var(--blue); }
+    .candidate { border-top:5px solid var(--amber); }
+    code { background:#f0f3f8; border-radius:6px; padding:.13em .4em; font-size:.92em; }
+    pre { overflow:auto; background:#111827; color:#eef2ff; border-radius:14px; padding:18px; line-height:1.55; }
+    table { border-collapse:collapse; width:100%; font-size:.94rem; }
+    th,td { border-bottom:1px solid var(--line); padding:11px 9px; text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    .quiz { background:#f7f8fc; border:1px solid var(--line); border-radius:16px; padding:20px; margin:18px 0; }
+    button { border:1px solid #b8c2d8; background:white; color:var(--ink); border-radius:999px; padding:8px 18px; margin:7px 7px 0 0; cursor:pointer; font:inherit; }
+    button:hover { border-color:var(--blue); color:var(--blue); }
+    .feedback { min-height:1.7em; margin-top:9px; font-weight:700; }
+    .good { color:var(--green); } .bad { color:var(--red); }
+    .recall { border:2px dashed var(--amber); background:#fff9ec; border-radius:16px; padding:21px; }
+    nav { margin-top:34px; padding-top:20px; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; gap:16px; }
+    a { color:var(--blue); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:680px) { .grid { grid-template-columns:1fr; } main { margin:16px auto; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } button { display:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 约 10 分钟</div>
+  <h1>把代码回归门和模型晋级门分开</h1>
+  <p class="lead">今天的胜利目标：看到一次失败时，你能先判断它属于“代码/数据回归”，还是“真实模型候选不稳定”，而不是习惯性点重跑。</p>
+
+  <div class="mission">
+    <strong>为什么这对求职重要：</strong>杭州 Agent 岗位面试官不只想听“我接了 GitHub Actions”，还会追问大模型有波动时 CI 怎么可信、密钥怎么保护、模型版本怎么晋级。这个项目现在有一套可以指给他看的答案。
+  </div>
+
+  <h2>一张图记住两道门</h2>
+  <div class="grid">
+    <section class="card offline">
+      <h3>门 A：确定性代码回归门</h3>
+      <p><strong>触发：</strong>每次 Push / Pull Request</p>
+      <p><strong>依赖：</strong>mock + deterministic + hash + extractive</p>
+      <p><strong>结论：</strong>红灯表示当前提交、黄金标签或硬规则回归。</p>
+      <p><strong>要求：</strong>快、稳定、无密钥、零模型费用。</p>
+    </section>
+    <section class="card candidate">
+      <h3>门 B：真实模型晋级门</h3>
+      <p><strong>触发：</strong>开发者手工确认</p>
+      <p><strong>依赖：</strong>真实千问分类、规划、Grounded Generation</p>
+      <p><strong>结论：</strong>红灯表示候选质量或跨轮稳定性不足。</p>
+      <p><strong>要求：</strong>多轮、留证、先跑基线、保护额度。</p>
+    </section>
+  </div>
+
+  <h2>为什么不能让 PR 直接依赖千问</h2>
+  <p>同一提交可能因为网络、限流、服务商更新或采样波动得到不同结果。若它是唯一合并门，开发者无法区分代码 Bug 和外部波动。ServiceOps 因此让门 A 决定“代码能否继续”，让门 B 决定“某个模型配置能否晋级”。</p>
+
+  <table>
+    <thead><tr><th>看到什么</th><th>先检查什么</th><th>不要做什么</th></tr></thead>
+    <tbody>
+      <tr><td>离线门红</td><td>代码 diff、数据集版本、违反规则码</td><td>不要重跑真实模型碰运气</td></tr>
+      <tr><td>基线绿、候选红</td><td>失败 case、路由/轨迹/契约/安全层</td><td>不要把它说成代码回归</td></tr>
+      <tr><td>一轮绿、两轮红</td><td>最差轮和全轮稳定率</td><td>不要只截最好一轮写简历</td></tr>
+    </tbody>
+  </table>
+
+  <h2>候选晋级看四个聚合证据</h2>
+  <pre><code>平均整体通过率       ≥ 90%
+最差轮整体通过率     ≥ 80%
+全轮稳定样本率       ≥ 80%
+平均安全不变量准确率 = 100%</code></pre>
+  <p>前三项防止“挑最好结果”；安全项防止用其他高分抵消越权泄漏、非法引用或审批前写入。门槛跟实验版本一起提交，不能看到成绩后临时改分数线。</p>
+
+  <h2>即时判断</h2>
+  <div class="quiz">
+    <strong>判断 1：</strong>Pull Request 应自动读取千问 Secret，并用真实模型结果作为唯一合并门。
+    <div>
+      <button onclick="answer('q1',false)">正确</button>
+      <button onclick="answer('q1',true)">错误</button>
+    </div>
+    <div id="q1" class="feedback" aria-live="polite"></div>
+  </div>
+  <div class="quiz">
+    <strong>判断 2：</strong>真实候选应先跑同提交离线基线，再比较多轮平均、最差轮和逐 case 稳定性。
+    <div>
+      <button onclick="answer('q2',true)">正确</button>
+      <button onclick="answer('q2',false)">错误</button>
+    </div>
+    <div id="q2" class="feedback" aria-live="polite"></div>
+  </div>
+
+  <h2>在代码里找到证据</h2>
+  <ol>
+    <li>打开 <code>.github/workflows/quality-gate.yml</code>，找到 <code>permissions: contents: read</code> 和离线后端变量。</li>
+    <li>打开 <code>.github/workflows/qwen-candidate-evaluation.yml</code>，确认它只有 <code>workflow_dispatch</code>。</li>
+    <li>打开 <code>evaluation/experiment.py</code>，找到平均、最差轮、全轮稳定和安全门的失败码。</li>
+    <li>直接运行示例 14 且不加参数，观察它在任何付费请求前安全退出。</li>
+  </ol>
+
+  <div class="recall">
+    <strong>闭卷复述（请回到对话回答）：</strong>
+    <p>为什么 ServiceOps 要把“确定性代码回归门”和“真实模型晋级门”分开？如果基线绿、候选三轮中只有一轮全通过，你会查看哪三个稳定性证据？</p>
+  </div>
+
+  <p><small>首选一手资料：<a href="https://docs.github.com/en/actions/reference/security/secure-use">GitHub Secure use reference</a>。不清楚 Action SHA、Artifact 或 workflow_dispatch 时，随时回到对话继续问我。</small></p>
+
+  <nav>
+    <a href="0003-agent-evaluation-four-layers.html">← 上一课：Agent 四层评测</a>
+    <a href="../reference/ci-and-model-promotion-checklist.html">打开：CI 与模型晋级速查表</a>
+  </nav>
+</main>
+<script>
+  function answer(id, isCorrect) {
+    const target = document.getElementById(id);
+    if (isCorrect) {
+      target.textContent = '答对了：你已经区分了代码回归证据和模型晋级证据。';
+      target.className = 'feedback good';
+    } else {
+      target.textContent = '再想一步：真实模型有费用和非确定性，不能成为 PR 的唯一信号。';
+      target.className = 'feedback bad';
+    }
+  }
+</script>
+</body>
+</html>

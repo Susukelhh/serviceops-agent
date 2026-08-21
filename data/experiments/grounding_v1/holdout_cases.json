@@ -1,0 +1,12 @@
+[
+  {"case_id":"ground-holdout-liquid-emergency","question":"饮料进电脑后还能继续充电测试吗？","evidence_refs":[{"document_id":"KB-WARRANTY-LIQUID-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","liquid"]},
+  {"case_id":"ground-holdout-invoice-pending","question":"发票还没生成票号时能否撤回修改抬头？","evidence_refs":[{"document_id":"KB-INVOICE-GENERAL-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","invoice"]},
+  {"case_id":"ground-holdout-address-shipped","question":"包裹已经出库后还能保证修改收货地址成功吗？","evidence_refs":[{"document_id":"KB-LOGISTICS-DELAY-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","logistics"]},
+  {"case_id":"ground-holdout-account-fraud","question":"半夜发现账号陌生消费，应该先采取什么安全操作？","evidence_refs":[{"document_id":"KB-SUPPORT-SECURITY-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","security"]},
+  {"case_id":"ground-holdout-digital-activated","question":"会员权益已经绑定账号后，非质量原因还能撤销吗？","evidence_refs":[{"document_id":"KB-DIGITAL-GOODS-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","digital"]},
+  {"case_id":"ground-holdout-gap-installment","question":"购买商品最多可以免息分多少期？","evidence_refs":[{"document_id":"KB-PRICE-PROTECTION-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","payment"]},
+  {"case_id":"ground-holdout-gap-gift-card","question":"礼品卡余额会不会过期，可以提现吗？","evidence_refs":[{"document_id":"KB-DIGITAL-GOODS-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","digital"]},
+  {"case_id":"ground-holdout-gap-repair-store","question":"杭州有哪些线下维修网点，离西湖最近的是哪家？","evidence_refs":[{"document_id":"KB-WARRANTY-GENERAL-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","warranty"]},
+  {"case_id":"ground-holdout-gap-invoice-mail","question":"纸质发票能否用顺丰寄到公司，邮费是多少？","evidence_refs":[{"document_id":"KB-INVOICE-GENERAL-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","invoice"]},
+  {"case_id":"ground-holdout-gap-delivery-slot","question":"可以指定晚上八点到九点之间送货吗？","evidence_refs":[{"document_id":"KB-LOGISTICS-DELAY-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","logistics"]}
+]

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第15课：用五个盒子读懂 Agent 架构</title>
+  <style>
+    :root { color-scheme:light; font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif; --ink:#17241f; --muted:#65726c; --line:#d9e3dd; --green:#146c4e; --soft:#edf7f2; --amber:#9a5a10; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:#eff4f1; line-height:1.7; }
+    main { width:min(940px,calc(100% - 32px)); margin:30px auto; padding:clamp(24px,5vw,56px); border:1px solid var(--line); border-radius:24px; background:#fff; box-shadow:0 18px 50px rgba(22,48,38,.08); }
+    .eyebrow { margin:0; color:var(--green); font-size:12px; font-weight:800; letter-spacing:.15em; }
+    h1 { margin:7px 0 10px; font-family:Georgia,"Songti SC",serif; font-size:clamp(30px,5vw,47px); line-height:1.14; }
+    h2 { margin:34px 0 12px; font-size:21px; }
+    p { margin:9px 0; } .lead { max-width:760px; color:var(--muted); font-size:17px; }
+    .mission,.analogy,.practice { margin:22px 0; padding:18px 20px; border-radius:15px; }
+    .mission { color:#eef9f4; background:#15362b; } .analogy { border-left:4px solid var(--green); background:var(--soft); }
+    .boxes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:22px; margin:22px 0; }
+    .box { position:relative; padding:14px 10px; border:1px solid var(--line); border-radius:13px; text-align:center; background:#fff; }
+    .box:not(:last-child)::after { position:absolute; top:50%; right:-18px; color:var(--green); content:"→"; transform:translateY(-50%); }
+    .box strong,.box span { display:block; } .box strong { font-size:13px; } .box span { margin-top:5px; color:var(--muted); font-size:11px; }
+    .formula { padding:15px; border-radius:12px; color:#eaf8f1; background:#10271f; font:700 13px/1.8 ui-monospace,"Cascadia Code",monospace; text-align:center; }
+    details { margin:10px 0; padding:13px 15px; border:1px solid var(--line); border-radius:12px; }
+    summary { cursor:pointer; font-weight:700; } details p { color:var(--muted); font-size:13px; }
+    .practice { border:1px solid #e7c892; background:#fff7e9; } .practice strong { color:var(--amber); }
+    a { color:var(--green); text-underline-offset:3px; } footer { margin-top:35px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+    @media(max-width:760px){ .boxes{grid-template-columns:1fr;gap:20px}.box:not(:last-child)::after{top:auto;right:50%;bottom:-21px;content:"↓";transform:translateX(50%)} }
+    @media print { body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none} }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">SERVICEOPS AGENT · LESSON 15</p>
+  <h1>用五个盒子读懂 Agent 架构</h1>
+  <p class="lead">这节课不要求你记住所有类名。完成后，你应该能在 90 秒内画出系统主干，并知道面试官点任何一个盒子时该打开哪部分代码。</p>
+
+  <section class="mission"><strong>与你的杭州 Agent 求职直接相关</strong><p>面试官看架构图不是考绘图软件，而是在判断你能否划分职责、解释数据流、发现风险边界并承认未完成项。</p></section>
+
+  <section class="analogy"><strong>生活类比：把 Agent 系统想成一家受监管的餐厅</strong><p>顾客先到前台，门卫检查身份，经理决定把需求送去哪个流程，厨房工具真正做事，账房保存进度和交易。经理可以建议菜品，但不能绕过门卫自己取钱或修改账本。</p></section>
+
+  <div class="boxes" aria-label="ServiceOps Agent 五层架构">
+    <div class="box"><strong>角色与入口</strong><span>谁在使用</span></div>
+    <div class="box"><strong>接入与安全</strong><span>能否进入</span></div>
+    <div class="box"><strong>LangGraph</strong><span>下一步去哪</span></div>
+    <div class="box"><strong>工具与数据</strong><span>真正做什么</span></div>
+    <div class="box"><strong>工程治理</strong><span>如何证明可靠</span></div>
+  </div>
+
+  <h2>架构图真正要回答的五个问题</h2>
+  <div class="formula">谁请求？ → 谁校验？ → 谁决策？ → 谁执行并保存？ → 谁验证它可靠？</div>
+
+  <h2>三个最容易混淆的地方</h2>
+  <details><summary>LangGraph 为什么不是“执行工具的人”？</summary><p>LangGraph 负责组织 State、节点和条件边；真正查询订单或写退货记录的是服务端工具与仓储。这样模型或路由即使出错，也不能自动获得数据库行动权。</p></details>
+  <details><summary>PostgreSQL 为什么在图上画成多个数据职责？</summary><p>它们可以在同一 PostgreSQL 实例中，但语义不同：Checkpoint 是流程进度，业务表是现实事实，审计表是决策证据。部署位置相同不代表职责相同。</p></details>
+  <details><summary>Nginx 双实例为什么还不能叫完整生产集群？</summary><p>它证明了轮询、共享状态和跨实例恢复机制；但没有覆盖 TLS、跨可用区、云数据库高可用、正式密钥管理和发布治理。</p></details>
+
+  <section class="practice"><strong>10分钟主动练习</strong><p>拿一张纸，先只画五个盒子，再从 LangGraph 画 FAQ、订单、退货三条分支，最后补 OTel 与 Eval 两条虚线。关闭本页，用 90 秒解释一遍；如果超过时间，删掉类名而不是加速念。</p></section>
+
+  <h2>可信资料</h2>
+  <p>状态图、持久化和中断概念以 <a href="https://docs.langchain.com/oss/python/langgraph/overview">LangGraph 官方概览</a>和<a href="https://docs.langchain.com/oss/python/langgraph/add-memory">官方持久化说明</a>为准；多客户端共享数据库的基础模型参考 <a href="https://www.postgresql.org/docs/current/tutorial-arch.html">PostgreSQL 客户端/服务器架构</a>。</p>
+  <p><a href="../reference/serviceops-architecture-whiteboard.html">打开一页式白板速查图</a> · <a href="../docs/architecture.md">阅读三张权威架构图</a></p>
+  <p>如果你无法解释某条箭头为什么存在，直接把箭头两端的名字发给我，我会带你沿真实代码追一次。</p>
+  <footer>架构图是代码与运行证据的索引，不是用来掩盖未实现能力的装饰。</footer>
+</main>
+</body>
+</html>

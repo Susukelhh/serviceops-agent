@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <!-- UTF-8 保证中文业务文案在 Windows 与容器中一致显示。 -->
+  <meta charset="utf-8">
+  <!-- viewport 让控制台在窄屏幕上切换为单栏布局。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- referrer 与服务端 Header 一致，不把控制台路径发送给外部站点。 -->
+  <meta name="referrer" content="no-referrer">
+  <!-- 页面标题同时说明这是可解释的售后 Agent 工作台。 -->
+  <title>ServiceOps Agent · 运行控制台</title>
+  <!-- 所有样式来自同源静态文件，满足服务端禁止内联样式的 CSP。 -->
+  <link rel="stylesheet" href="/console/assets/console.css">
+</head>
+<body>
+  <!-- 跳转链接让键盘用户可以直接越过侧栏进入主要对话区域。 -->
+  <a class="skip-link" href="#conversation-title">跳到 Agent 对话</a>
+
+  <!-- app-shell 组织固定侧栏与主要工作区。 -->
+  <div class="app-shell">
+    <!-- 侧栏显示产品定位、系统状态和演示入口。 -->
+    <aside class="sidebar" aria-label="ServiceOps Agent 导航与状态">
+      <!-- 品牌区只使用文字与 CSS 图形，不依赖第三方图片。 -->
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <p class="brand-name">ServiceOps</p>
+          <p class="brand-subtitle">Agent Console</p>
+        </div>
+      </div>
+
+      <!-- 环境标签提醒面试演示当前不是生产系统。 -->
+      <div class="environment-chip">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        <span id="environment-label">正在检查环境</span>
+      </div>
+
+      <!-- 场景按钮会把真实示例问题填入输入框，但不会自动发送。 -->
+      <section class="sidebar-section" aria-labelledby="scenario-title">
+        <div class="section-heading-row">
+          <h2 id="scenario-title">演示场景</h2>
+          <span class="section-count">4</span>
+        </div>
+        <div class="scenario-list">
+          <button class="scenario-button" type="button" data-prompt="查询订单 SO100001 到哪了">
+            <span class="scenario-index">01</span>
+            <span><strong>订单工具调用</strong><small>规划 → 查询 → 观察</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-prompt="发票税号写错了怎么办">
+            <span class="scenario-index">02</span>
+            <span><strong>有据 RAG 回答</strong><small>检索 → 引用 → 回答</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-prompt="查询订单 SO200001 到哪了">
+            <span class="scenario-index">03</span>
+            <span><strong>越权信息隐藏</strong><small>身份绑定 → 安全拒绝</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-prompt="为订单 SO100002 申请退货，原因：商品尺寸不合适" data-write-intent="true">
+            <span class="scenario-index">04</span>
+            <span><strong>人工审批恢复</strong><small>草案 → 暂停 → 审批</small></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- readiness 使用现有只读接口展示四个持久化边界。 -->
+      <section class="sidebar-section system-section" aria-labelledby="system-title">
+        <div class="section-heading-row">
+          <h2 id="system-title">系统状态</h2>
+          <button id="refresh-health-button" class="text-button" type="button">刷新</button>
+        </div>
+        <div id="system-status-list" class="system-status-list" aria-live="polite">
+          <div class="status-row"><span>正在读取 readiness</span><span class="status-dot pending"></span></div>
+        </div>
+      </section>
+
+      <!-- 侧栏底部保留 Swagger 与课程文档入口。 -->
+      <div class="sidebar-footer">
+        <a href="/docs" target="_blank" rel="noreferrer">API 文档</a>
+        <span aria-hidden="true">·</span>
+        <button id="open-token-panel-button" class="link-button" type="button">配置身份</button>
+      </div>
+    </aside>
+
+    <!-- main-workspace 是控制台主要内容。 -->
+    <main class="main-workspace">
+      <!-- 顶部说明当前工作台强调证据而不是黑盒聊天。 -->
+      <header class="workspace-header">
+        <div>
+          <p class="eyebrow">EVIDENCE-FIRST AGENT OPERATIONS</p>
+          <h1>看见 Agent 如何做决定</h1>
+          <p class="workspace-description">真实调用 LangGraph、RAG、业务工具与人工审批；教学调试模式可逐步回放状态和 Checkpoint，但不暴露模型隐藏推理原文。</p>
+        </div>
+        <div class="header-actions">
+          <button id="clear-session-button" class="secondary-button" type="button">清空本页</button>
+          <button id="header-token-button" class="primary-outline-button" type="button">身份与权限</button>
+        </div>
+      </header>
+
+      <!-- metric-strip 展示最近一次真实请求的有限运行摘要。 -->
+      <section class="metric-strip" aria-label="最近一次执行摘要">
+        <article class="metric-card">
+          <span class="metric-label">处理实例</span>
+          <strong id="instance-metric">—</strong>
+          <small>由 Nginx 在 A/B 间轮询</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">识别意图</span>
+          <strong id="intent-metric">等待请求</strong>
+          <small id="confidence-metric">置信度 —</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">工具调用</span>
+          <strong id="tool-metric">0 次</strong>
+          <small id="tool-name-metric">尚未执行</small>
+        </article>
+        <article class="metric-card accent-card">
+          <span class="metric-label">执行状态</span>
+          <strong id="execution-metric">READY</strong>
+          <small id="thread-metric">等待新线程</small>
+        </article>
+      </section>
+
+      <!-- content-grid 把对话与执行证据并列，宽度不足时自动变成单栏。 -->
+      <div class="content-grid">
+        <!-- conversation-panel 负责用户输入、回答、引用和审批交互。 -->
+        <section class="panel conversation-panel" aria-labelledby="conversation-title">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">CUSTOMER WORKSPACE</p>
+              <h2 id="conversation-title">售后对话</h2>
+            </div>
+            <span id="conversation-state" class="state-badge idle">等待输入</span>
+          </div>
+
+          <!-- 消息区域使用 aria-live 宣布新回答。 -->
+          <div id="message-list" class="message-list" aria-live="polite">
+            <article class="message assistant-message welcome-message">
+              <div class="message-avatar" aria-hidden="true">SO</div>
+              <div class="message-content">
+                <div class="message-meta"><strong>ServiceOps Agent</strong><span>现在</span></div>
+                <p>你好。我可以查询本人订单、回答有据售后政策，也能为符合条件的退货生成草案并等待人工审批。</p>
+                <p class="message-hint">先在左侧选择一个演示场景，或者输入自己的问题。</p>
+              </div>
+            </article>
+          </div>
+
+          <!-- approval-card 只在后端真实返回 approval_required 时显示。 -->
+          <section id="approval-card" class="approval-card hidden" aria-labelledby="approval-title">
+            <div class="approval-topline">
+              <div>
+                <p class="panel-kicker">HUMAN-IN-THE-LOOP</p>
+                <h3 id="approval-title">等待人工审批</h3>
+              </div>
+              <span class="approval-lock">写操作尚未执行</span>
+            </div>
+            <dl id="approval-details" class="approval-details"></dl>
+            <label class="field-label" for="approval-comment">审批备注</label>
+            <input id="approval-comment" class="text-input" type="text" maxlength="500" value="已核对订单与退货资格">
+            <div class="approval-actions">
+              <button id="reject-approval-button" class="danger-button" type="button">拒绝申请</button>
+              <button id="approve-approval-button" class="approve-button" type="button">批准并恢复图</button>
+            </div>
+            <p id="approval-help" class="field-help">需要单独的退货审批 Token；普通用户 Token 无法执行该操作。</p>
+          </section>
+
+          <!-- citations-card 展示后端白名单确认过的知识来源。 -->
+          <section id="citations-card" class="evidence-card hidden" aria-labelledby="citations-title">
+            <div class="evidence-heading">
+              <h3 id="citations-title">回答依据</h3>
+              <span id="retrieval-score-label">检索分数 —</span>
+            </div>
+            <div id="citation-list" class="citation-list"></div>
+          </section>
+
+          <!-- composer 只提交 message 和可选幂等键，身份永远不放请求体。 -->
+          <form id="chat-form" class="composer">
+            <label class="visually-hidden" for="message-input">输入售后问题</label>
+            <textarea id="message-input" rows="3" maxlength="4000" placeholder="例如：查询订单 SO100001 到哪了" required></textarea>
+            <div class="composer-footer">
+              <div class="idempotency-field">
+                <label for="idempotency-input">写操作幂等键</label>
+                <input id="idempotency-input" type="text" maxlength="128" placeholder="退货演示时自动生成">
+              </div>
+              <button id="send-button" class="send-button" type="submit">
+                <span>运行 Agent</span><span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- evidence-column 展示执行时间线和审计证据。 -->
+        <div class="evidence-column">
+          <section class="panel trace-panel" aria-labelledby="trace-title">
+            <div class="panel-header compact-header">
+              <div>
+                <p class="panel-kicker">LANGGRAPH TRACE</p>
+                <h2 id="trace-title">执行时间线</h2>
+              </div>
+              <span id="trace-count" class="section-count">0</span>
+            </div>
+            <div id="route-reason" class="route-reason hidden"></div>
+            <ol id="timeline-list" class="timeline-list">
+              <li class="timeline-empty">
+                <span class="empty-orbit" aria-hidden="true"></span>
+                <strong>还没有执行轨迹</strong>
+                <p>运行一个场景后，这里会按顺序显示认证、分类、路由、检索、工具和响应事件。</p>
+              </li>
+            </ol>
+          </section>
+
+          <!-- audit-card 在审批完成后允许审计员验证哈希链。 -->
+          <section id="audit-card" class="panel audit-panel hidden" aria-labelledby="audit-title">
+            <div class="panel-header compact-header">
+              <div>
+                <p class="panel-kicker">APPEND-ONLY AUDIT</p>
+                <h2 id="audit-title">审批证据链</h2>
+              </div>
+              <button id="load-audit-button" class="text-button" type="button">验证链</button>
+            </div>
+            <div id="audit-content" class="audit-content">
+              <p>审批完成。使用独立审计员 Token 读取最小化、不可原地修改的哈希链。</p>
+            </div>
+          </section>
+
+          <!-- contract-note 解释时间线不是模型私密思维过程。 -->
+          <aside class="contract-note">
+            <span class="contract-mark" aria-hidden="true">i</span>
+            <p><strong>展示的是可审计事件，不是思维链。</strong>页面只呈现服务端主动公开的路由原因、工具轨迹、引用与状态，不要求模型暴露隐藏推理过程。</p>
+          </aside>
+        </div>
+      </div>
+
+      <!--
+        debug-inspector 独占完整内容宽度，不再被压缩进右侧证据栏。
+        它使用独立 developer Token 读取后端脱敏的 LangGraph StateSnapshot 历史。
+      -->
+      <section id="debug-inspector" class="panel debug-inspector debug-lab" aria-labelledby="debug-title">
+        <div class="panel-header debug-lab-header">
+          <div class="debug-title-block">
+            <p class="panel-kicker">CHECKPOINT PLAYBACK · LEARNING LAB</p>
+            <h2 id="debug-title">Agent 执行回放工作台</h2>
+            <p>逐步查看节点流转、State 前后差异、工具与 RAG、安全审批和持久化快照。</p>
+          </div>
+          <div class="debug-header-actions">
+            <span class="debug-keyboard-hint">← → 切换步骤 · Esc 退出大屏</span>
+            <button id="load-debug-button" class="primary-outline-button" type="button">重新读取流程</button>
+            <button id="debug-focus-button" class="debug-focus-button" type="button" aria-pressed="false">
+              <span aria-hidden="true">⛶</span>
+              <span class="debug-focus-label">专注大屏</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- debug-lock-state 在没有线程或 developer Token 时仍占据清晰、可见的教学区域。 -->
+        <div id="debug-lock-state" class="debug-lock-state debug-lock-large">
+          <span class="debug-lock-mark" aria-hidden="true">D</span>
+          <div>
+            <strong>运行一个场景后，这里会出现完整流程</strong>
+            <p>配置 developer Token 后，可从 C1 开始逐步查看节点、状态差异、条件边、Checkpoint、工具/RAG 和人工中断。</p>
+          </div>
+        </div>
+
+        <!-- debug-workbench 只有成功读取真实线程历史后才显示。 -->
+        <div id="debug-workbench" class="debug-workbench hidden">
+          <!-- 顶部播放控制区始终占满宽度，长流程可横向滚动。 -->
+          <div class="debug-control-deck">
+            <div class="debug-toolbar">
+              <button id="debug-previous-button" class="debug-nav-button" type="button" aria-label="上一个 Checkpoint">←</button>
+              <div>
+                <strong id="debug-position">Checkpoint 0 / 0</strong>
+                <small id="debug-status">等待读取</small>
+              </div>
+              <button id="debug-next-button" class="debug-nav-button" type="button" aria-label="下一个 Checkpoint">→</button>
+            </div>
+
+            <div class="debug-stepper-region">
+              <span class="debug-region-label">执行步骤</span>
+              <!-- 横向步骤条中的每个按钮代表一个真实 StateSnapshot。 -->
+              <div id="debug-stepper" class="debug-stepper" aria-label="Checkpoint 步骤列表"></div>
+            </div>
+          </div>
+
+          <!-- 左侧负责解释流程，右侧负责大面积阅读状态数据。 -->
+          <div class="debug-stage">
+            <aside class="debug-overview" aria-label="当前 Checkpoint 流程摘要">
+              <span class="debug-region-label">这一步发生了什么</span>
+              <article id="debug-summary" class="debug-summary"></article>
+              <p id="debug-disclosure" class="debug-disclosure"></p>
+            </aside>
+
+            <section class="debug-data-workspace" aria-label="当前 Checkpoint 详细数据">
+              <div class="debug-data-heading">
+                <div>
+                  <span class="debug-region-label">状态检查器</span>
+                  <strong>查看公开状态与前后变化</strong>
+                </div>
+                <!-- 视图标签只在当前快照的脱敏数据之间切换，不重新请求后端。 -->
+                <div id="debug-tabs" class="debug-tabs" role="tablist" aria-label="调试信息分类">
+                  <button class="debug-tab active" type="button" role="tab" data-debug-view="changes" aria-selected="true">状态变化</button>
+                  <button class="debug-tab" type="button" role="tab" data-debug-view="state" aria-selected="false">当前状态</button>
+                  <button class="debug-tab" type="button" role="tab" data-debug-view="tools" aria-selected="false">工具 / RAG</button>
+                  <button class="debug-tab" type="button" role="tab" data-debug-view="approval" aria-selected="false">安全审批</button>
+                  <button class="debug-tab" type="button" role="tab" data-debug-view="checkpoint" aria-selected="false">Checkpoint</button>
+                </div>
+              </div>
+
+              <!-- 所有动态值均由 console.js 使用 textContent 创建。 -->
+              <div id="debug-details" class="debug-details" role="tabpanel"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- token-dialog 使用原生 dialog，支持键盘焦点管理和 Escape 关闭。 -->
+  <dialog id="token-dialog" class="token-dialog" aria-labelledby="token-dialog-title">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-header">
+        <div>
+          <p class="panel-kicker">LOCAL DEMO IDENTITY</p>
+          <h2 id="token-dialog-title">身份与最小权限</h2>
+        </div>
+        <button class="icon-button" value="cancel" aria-label="关闭身份配置" type="submit">×</button>
+      </div>
+      <p class="dialog-description">先运行 <code>examples/09_generate_dev_tokens.py</code>，再把不同角色的短期 Token 分别粘贴到对应位置。Token 仅保存在当前页面内存，刷新即清空。</p>
+
+      <div class="token-fields">
+        <label class="token-field" for="customer-token-input">
+          <span><strong>普通用户</strong><small>sub=user-001 · agent:chat</small></span>
+          <input id="customer-token-input" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 customer Token">
+        </label>
+        <label class="token-field" for="reviewer-token-input">
+          <span><strong>退货审批人</strong><small>return:approve</small></span>
+          <input id="reviewer-token-input" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 reviewer Token">
+        </label>
+        <label class="token-field" for="auditor-token-input">
+          <span><strong>安全审计员</strong><small>audit:read</small></span>
+          <input id="auditor-token-input" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 auditor Token">
+        </label>
+        <label class="token-field" for="developer-token-input">
+          <span><strong>本地开发调试</strong><small>debug:read · 生产环境关闭</small></span>
+          <input id="developer-token-input" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 developer Token">
+        </label>
+      </div>
+
+      <div class="security-note">
+        <strong>为什么不提供“免登录演示”？</strong>
+        <p>那会绕过项目最重要的身份绑定和职责分离。控制台与 Swagger 使用完全相同的 JWT 边界。</p>
+      </div>
+
+      <div class="dialog-actions">
+        <button id="clear-tokens-button" class="secondary-button" type="button">清空全部 Token</button>
+        <button id="save-tokens-button" class="approve-button" type="button">仅在本页使用</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- toast 负责显示短暂成功或错误消息，不遮挡主内容。 -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- 逻辑脚本来自同源外部文件，不需要 CSP unsafe-inline。 -->
+  <script src="/console/assets/console.js" defer></script>
+</body>
+</html>

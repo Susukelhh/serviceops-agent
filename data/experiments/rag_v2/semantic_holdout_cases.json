@@ -1,0 +1,12 @@
+[
+  {"case_id":"semantic-holdout-return-inspection","question":"我只为确认好不好用而开盒短暂试过，没有留下痕迹，还能反悔吗？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["semantic-paraphrase","return"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-custom-photo","question":"用我上传的照片做成的纪念品没有瑕疵，只是不喜欢成品，可以不要吗？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["semantic-paraphrase","customized"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-digital-unused","question":"付款后始终没看到那串线上权益，也没有用过，应该如何处理？","expected_document_ids":["KB-DIGITAL-GOODS-001"],"should_retrieve":true,"tags":["semantic-paraphrase","digital"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-warranty-quote","question":"官方检测说要自费，他们是不是应该先告诉我金额，得到同意后才能动手？","expected_document_ids":["KB-WARRANTY-GENERAL-001"],"should_retrieve":true,"tags":["semantic-paraphrase","paid-repair"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-invoice-red","question":"报销用的公司信息写错且文件已经生成，为什么不能在原文件上改？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["semantic-paraphrase","invoice-correction"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-logistics-neighbor","question":"配送状态结束了，但门卫邻居和家里人都说没代拿，要查哪些记录？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["semantic-paraphrase","signed-missing"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-price-competitor","question":"另一家平台卖得更低，这里会按外站价格退我差额吗？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_retrieve":true,"tags":["semantic-paraphrase","price-protection"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-support-night","question":"半夜账号出现陌生消费时，在线人工不在该走哪个紧急入口？","expected_document_ids":["KB-SUPPORT-SECURITY-001"],"should_retrieve":true,"tags":["semantic-paraphrase","security"],"difficulty":"hard"},
+  {"case_id":"semantic-holdout-negative-membership","question":"付费会员每个月能领多少张优惠券？","expected_document_ids":[],"should_retrieve":false,"tags":["near-domain","knowledge-gap"],"difficulty":"adversarial"},
+  {"case_id":"semantic-holdout-negative-payment","question":"你们支持数字人民币和货到付款吗？","expected_document_ids":[],"should_retrieve":false,"tags":["near-domain","knowledge-gap"],"difficulty":"adversarial"}
+]

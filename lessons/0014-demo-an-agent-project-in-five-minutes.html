@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第14课：五分钟讲清一个企业 Agent 项目</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif; --ink:#17241f; --muted:#64736b; --line:#dbe5df; --green:#146e50; --soft:#edf7f2; --amber:#a65d0a; }
+    * { box-sizing: border-box; }
+    body { margin:0; color:var(--ink); background:#f1f5f2; line-height:1.7; }
+    main { width:min(940px, calc(100% - 32px)); margin:32px auto; padding:clamp(24px,5vw,58px); border:1px solid var(--line); border-radius:24px; background:#fff; box-shadow:0 18px 55px rgba(23,50,39,.08); }
+    .eyebrow { margin:0; color:var(--green); font-size:12px; font-weight:800; letter-spacing:.14em; }
+    h1 { margin:8px 0 12px; font-family:Georgia,"Songti SC",serif; font-size:clamp(30px,5vw,48px); line-height:1.14; }
+    h2 { margin:36px 0 12px; font-size:21px; }
+    p { margin:10px 0; }
+    .lead { max-width:760px; color:var(--muted); font-size:17px; }
+    .analogy,.mission,.practice { margin:22px 0; padding:18px 20px; border-radius:15px; }
+    .analogy { border-left:4px solid var(--green); background:var(--soft); }
+    .mission { color:#f3fbf7; background:#15372b; }
+    .timeline { display:grid; gap:10px; margin-top:16px; }
+    .step { display:grid; grid-template-columns:112px 1fr; gap:16px; padding:15px; border:1px solid var(--line); border-radius:14px; }
+    .time { color:var(--green); font:800 12px/1.4 ui-monospace,"Cascadia Code",monospace; }
+    .step strong,.step span { display:block; }
+    .step span { margin-top:4px; color:var(--muted); font-size:13px; }
+    .formula { padding:16px; overflow-x:auto; border-radius:13px; color:#eaf8f1; background:#10271f; font:700 14px/1.7 ui-monospace,"Cascadia Code",monospace; white-space:pre-wrap; }
+    details { margin:10px 0; padding:13px 15px; border:1px solid var(--line); border-radius:12px; }
+    summary { cursor:pointer; font-weight:700; }
+    details p { color:var(--muted); font-size:13px; }
+    .practice { border:1px solid #edd3a8; background:#fff7e9; }
+    .practice strong { color:var(--amber); }
+    a { color:var(--green); text-underline-offset:3px; }
+    footer { margin-top:38px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+    @media (max-width:620px) { .step { grid-template-columns:1fr; gap:5px; } main { margin:16px auto; } }
+    @media print { body { background:#fff; } main { width:100%; margin:0; border:0; box-shadow:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">SERVICEOPS AGENT · LESSON 14</p>
+  <h1>五分钟讲清一个企业 Agent 项目</h1>
+  <p class="lead">你的目标不是在五分钟内证明自己记住了全部框架，而是让面试官清楚看到：你解决了什么问题、系统如何控制风险、证据在哪里，以及你知道哪些事情还没做到。</p>
+
+  <section class="mission">
+    <strong>与你的求职任务直接相关</strong>
+    <p>近期杭州 Agent 应用岗位更看重“能落地、能排错、能解释取舍”。因此演示重点是可运行证据，不是把 LangChain、LangGraph 名词全部念一遍。</p>
+  </section>
+
+  <section class="analogy">
+    <strong>生活类比：项目演示像电影预告片</strong>
+    <p>预告片不会把两小时电影逐帧播放，而会选出最能说明冲突、能力和结局的片段。项目演示也一样：订单工具证明行动能力，RAG 证明证据边界，越权场景证明安全，人工审批证明可控写入。</p>
+  </section>
+
+  <h2>记住这一条表达公式</h2>
+  <div class="formula">业务问题 → Agent 决策 → 确定性执行 → 安全边界 → 可验证证据</div>
+
+  <h2>五分钟只演示四段</h2>
+  <div class="timeline">
+    <article class="step"><span class="time">0:00—1:40</span><div><strong>订单工具 + Checkpoint</strong><span>证明模型不能直接查库；规划、白名单、身份绑定、工具观察和状态恢复彼此分开。</span></div></article>
+    <article class="step"><span class="time">1:40—2:30</span><div><strong>有据 RAG</strong><span>证明回答必须带已发布公共证据；无证据、低分或非法引用会安全降级。</span></div></article>
+    <article class="step"><span class="time">2:30—3:15</span><div><strong>跨用户信息隐藏</strong><span>证明 JWT sub 才是可信身份，用户文本不能覆盖工具查询条件。</span></div></article>
+    <article class="step"><span class="time">3:15—5:00</span><div><strong>人工审批 + 工程证据</strong><span>证明 interrupt 前零写入、批准后恢复原线程，同时诚实说明本机 Docker 不等于完整生产平台。</span></div></article>
+  </div>
+
+  <h2>三个必须能脱稿回答的问题</h2>
+  <details><summary>1. 为什么这里必须用状态图？先自己回答，再展开。</summary><p>因为流程不只是 A→B→C：订单路径存在工具循环，退货路径需要暂停、人工输入和跨进程恢复。显式 State、条件边和 Checkpoint 让这些行为可测试、可回放。</p></details>
+  <details><summary>2. Checkpoint 和业务表分别保存什么？</summary><p>Checkpoint 保存 Agent 做到哪里；业务表保存现实业务已经发生什么。暂停等待审批时可以只有 Checkpoint，没有退货记录。</p></details>
+  <details><summary>3. 为什么不展示模型隐藏思维原文？</summary><p>它不是稳定审计证据，还可能泄漏提示词和内部信息。项目展示结构化决策、路由原因、工具计划、引用和状态变化。</p></details>
+
+  <section class="practice">
+    <strong>今天的练习（8分钟）</strong>
+    <p>运行 <code>examples/21_interview_demo.py</code>，打开控制台后只演示订单场景。关闭这份课件，用自己的话在 90 秒内讲出“问题—决策—工具—安全—证据”五部分。讲完再对照 Runbook，记录漏掉的两个点。</p>
+  </section>
+
+  <h2>可信资料与下一步</h2>
+  <p>框架行为以 <a href="https://docs.langchain.com/oss/python/langgraph/overview">LangGraph 官方概览</a>和<a href="https://docs.langchain.com/oss/python/langgraph/add-memory">官方持久化说明</a>为准；容器演示边界参考 <a href="https://docs.docker.com/build/building/best-practices/">Docker 构建最佳实践</a>。</p>
+  <p><a href="../reference/agent-interview-demo-card.html">打开一页式演示速查卡</a> · <a href="../docs/runbooks/21-interview-demo-runbook.md">查看完整五分钟 Runbook</a></p>
+  <p>练习中任何一句讲不顺，都可以把那句话发给我，我会帮你改成符合你当前理解程度的表达。</p>
+
+  <footer>本课只训练项目演示能力，不替代逐文件代码学习。所有性能和模型数字仍以项目真实报告为准。</footer>
+</main>
+</body>
+</html>

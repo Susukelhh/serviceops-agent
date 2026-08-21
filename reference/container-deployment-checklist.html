@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent 容器部署速查表</title>
+  <style>
+    :root { --ink:#172033; --muted:#687083; --line:#d9dee8; --blue:#2457d6; --green:#147d64; --paper:#fff; --orange:#a95517; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#edf1f7; color:var(--ink); font:15px/1.55 ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(1080px,calc(100% - 28px)); margin:28px auto; background:var(--paper); border:1px solid var(--line); border-radius:18px; padding:34px; box-shadow:0 16px 45px rgba(30,48,80,.1); }
+    h1 { margin:0; font:800 34px/1.1 ui-serif,Georgia,"Songti SC",serif; }
+    .sub { color:var(--muted); margin:.55em 0 1.8em; }
+    .columns { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    section { border:1px solid var(--line); border-radius:14px; padding:18px; break-inside:avoid; }
+    h2 { color:var(--blue); font-size:18px; margin:0 0 9px; }
+    ul,ol { margin:0; padding-left:20px; }
+    li { margin:5px 0; }
+    code { background:#f0f3f8; border-radius:5px; padding:.12em .35em; }
+    .wide { grid-column:1 / -1; }
+    .line { border-left:5px solid var(--green); background:#eef9f4; padding:13px 16px; margin-top:18px; }
+    .warn { border-left-color:var(--orange); background:#fff8ed; }
+    table { border-collapse:collapse; width:100%; }
+    th,td { border-bottom:1px solid var(--line); padding:8px; text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    footer { color:var(--muted); margin-top:18px; font-size:13px; }
+    @media(max-width:700px) { .columns { grid-template-columns:1fr; } .wide { grid-column:auto; } main { padding:22px; } }
+    @media print { body { background:white; } main { width:100%; margin:0; padding:0; border:0; box-shadow:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Agent 容器部署速查表</h1>
+  <p class="sub">ServiceOps Agent · 面试前 2 分钟复习 / 构建前检查 / 可打印</p>
+  <div class="columns">
+    <section>
+      <h2>构建可复现</h2>
+      <ul>
+        <li>Python tag + digest 固定</li>
+        <li>uv 版本固定，<code>uv.lock</code> 严格同步</li>
+        <li>依赖层先复制，源码层后复制</li>
+        <li>项目以 <code>--no-editable</code> 安装</li>
+        <li>builder 工具不进入 runtime</li>
+      </ul>
+    </section>
+    <section>
+      <h2>构建上下文</h2>
+      <ul>
+        <li>排除 <code>.env</code> 与所有本机密钥</li>
+        <li>排除 <code>.venv</code>、IDE 和缓存</li>
+        <li>排除 SQLite/WAL/评测报告</li>
+        <li>只复制运行依赖与 <code>data/seed</code></li>
+        <li>Secret 在运行时注入，不写镜像层</li>
+      </ul>
+    </section>
+    <section>
+      <h2>运行最小权限</h2>
+      <ul>
+        <li>固定 <code>USER 10001:10001</code></li>
+        <li>根文件系统只读</li>
+        <li>Capability 全删除</li>
+        <li><code>no-new-privileges</code></li>
+        <li>PID / CPU / 内存边界</li>
+      </ul>
+    </section>
+    <section>
+      <h2>状态与进程</h2>
+      <ul>
+        <li><code>data/seed</code> 镜像内只读</li>
+        <li><code>data/runtime</code> 具名卷可写</li>
+        <li>一个容器一个 Uvicorn worker</li>
+        <li>SIGTERM + lifespan 优雅关闭</li>
+        <li>多副本前迁移 PostgreSQL</li>
+      </ul>
+    </section>
+    <section class="wide">
+      <h2>三层部署冒烟</h2>
+      <table>
+        <tr><th>层</th><th>检查</th><th>失败说明</th></tr>
+        <tr><td>Liveness</td><td><code>GET /health = 200/ok</code></td><td>Web 进程没有正常服务</td></tr>
+        <tr><td>Readiness</td><td><code>GET /ready = 200</code> 且四依赖 ready</td><td>进程活着但不能接业务流量</td></tr>
+        <tr><td>Security</td><td>无 JWT 的 chat 必须 401</td><td>部署配置绕过了应用认证</td></tr>
+      </table>
+    </section>
+    <section class="wide">
+      <h2>安装 Docker 后的最短命令</h2>
+      <ol>
+        <li><code>docker compose config</code></li>
+        <li><code>docker compose up --build --detach</code></li>
+        <li><code>uv run python examples/15_container_smoke_test.py</code></li>
+        <li><code>docker compose logs --tail 100 serviceops-agent</code></li>
+        <li><code>docker compose down</code>（默认保留数据卷）</li>
+      </ol>
+    </section>
+  </div>
+  <div class="line"><strong>面试一句话：</strong>我用锁文件和 digest 构建多阶段镜像，最终进程以非 root、只读根目录和单 worker 运行；平台根据真实 readiness 分流，SQLite 只作为单机演练状态层。</div>
+  <div class="line warn"><strong>不能夸大的边界：</strong>容器能启动 ≠ 已生产可用；当前尚缺 PostgreSQL 多副本、企业 OIDC、TLS/限流、备份恢复、镜像扫描与容量压测证据。</div>
+  <footer>参考：Docker multi-stage/build best practices、FastAPI Docker deployment、uv Docker integration。镜像摘要会随受控依赖升级更新。</footer>
+</main>
+</body>
+</html>

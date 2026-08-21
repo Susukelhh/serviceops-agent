@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第六课：用开餐厅理解 Docker</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#60697a; --blue:#2657d8; --green:#11775f; --orange:#c35b17; --paper:#fffdf8; --line:#e2e6ec; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#edf4ff,#fffaf1 55%,#eefaf5); color:var(--ink); font:17px/1.75 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(940px,calc(100% - 30px)); margin:32px auto; padding:clamp(23px,5vw,56px); background:rgba(255,255,255,.96); border:1px solid var(--line); border-radius:22px; box-shadow:0 20px 65px rgba(31,52,91,.12); }
+    h1 { margin:.15em 0 .35em; font:800 clamp(34px,6vw,56px)/1.12 Georgia,"Songti SC",serif; letter-spacing:-.035em; }
+    h2 { margin:2em 0 .55em; font-size:1.42rem; }
+    .eyebrow { color:var(--blue); font-weight:780; letter-spacing:.08em; }
+    .lead { color:var(--muted); font-size:1.12rem; }
+    .answer { background:#edf9f4; border-left:5px solid var(--green); border-radius:10px; padding:16px 20px; }
+    .story { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:20px 0; }
+    .card { background:var(--paper); border:1px solid var(--line); border-radius:15px; padding:18px; }
+    .card strong { color:var(--blue); }
+    .map { width:100%; border-collapse:collapse; }
+    .map th,.map td { padding:11px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    .map th { color:var(--muted); }
+    code { background:#f0f3f7; border-radius:6px; padding:.12em .4em; }
+    pre { overflow:auto; background:#111827; color:#f1f5ff; border-radius:14px; padding:18px; line-height:1.6; }
+    .warn { background:#fff4e8; border-left:5px solid var(--orange); border-radius:10px; padding:16px 20px; }
+    .quiz { margin-top:18px; padding:20px; border:1px solid var(--line); border-radius:15px; background:#f8f9fc; }
+    button { margin:9px 8px 0 0; padding:8px 18px; border:1px solid #b9c4d8; border-radius:999px; background:white; font:inherit; cursor:pointer; }
+    button:hover { color:var(--blue); border-color:var(--blue); }
+    #feedback { min-height:1.8em; margin-top:8px; font-weight:750; }
+    nav { display:flex; flex-wrap:wrap; gap:16px; margin-top:32px; padding-top:18px; border-top:1px solid var(--line); }
+    a { color:var(--blue); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:680px) { .story { grid-template-columns:1fr; } main { margin:14px auto; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } button { display:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 零基础 6 分钟</div>
+  <h1>把 Docker 想成“标准化餐包”</h1>
+  <p class="lead">这一课只解决一个问题：Docker 到底有什么用？先不背命令，也先不讨论复杂部署。</p>
+
+  <div class="answer"><strong>一句话答案：</strong>Docker 把“程序以及它运行需要的环境”一起打包，让它换一台电脑也更容易用同样的方法启动。</div>
+
+  <h2>为什么只发代码还不够</h2>
+  <p>假设你开了一家餐厅，只把菜谱发给杭州分店。分店可能没有同样的锅、调料和食材，最后做出的菜就不一样。</p>
+  <div class="story">
+    <section class="card"><strong>没有 Docker</strong><br>你只交付菜谱。另一台电脑还要自己安装正确版本的 Python、第三方包和系统环境，装错一个版本就可能启动失败。</section>
+    <section class="card"><strong>使用 Docker</strong><br>你交付一个标准化餐包：菜谱、食材和制作要求已经配好。另一台装有 Docker 的电脑照同一规则打开餐包即可。</section>
+  </div>
+
+  <h2>把餐厅例子映射到项目</h2>
+  <table class="map">
+    <thead><tr><th>餐厅里的东西</th><th>Docker 名词</th><th>我们的项目</th></tr></thead>
+    <tbody>
+      <tr><td>菜谱和原材料清单</td><td>源代码与依赖清单</td><td><code>D:\serviceops-agent</code>、<code>pyproject.toml</code>、<code>uv.lock</code></td></tr>
+      <tr><td>制作标准化餐包的说明</td><td>Dockerfile</td><td>告诉 Docker 使用什么 Python、安装哪些依赖、怎样启动 FastAPI</td></tr>
+      <tr><td>封好但尚未开火的餐包</td><td>镜像 Image</td><td><code>serviceops-agent:local</code></td></tr>
+      <tr><td>已经打开并正在营业的一份餐包</td><td>容器 Container</td><td>当前正在运行的 ServiceOps Agent</td></tr>
+      <tr><td>顾客取餐窗口</td><td>端口 Port</td><td><code>127.0.0.1:8000</code></td></tr>
+      <tr><td>店外长期保存的档案柜</td><td>数据卷 Volume</td><td>保存 SQLite 记录；餐厅关门再开，档案仍在</td></tr>
+    </tbody>
+  </table>
+
+  <h2>你刚才实际完成了什么</h2>
+  <pre><code>docker compose build   制作标准化餐包（镜像）
+docker compose up      打开餐包并开始营业（容器）
+docker compose ps      查看餐厅是否正在营业
+docker compose logs    查看营业日志和报错
+docker compose down    关门，但保留外部档案柜</code></pre>
+  <p>因此，Docker 没有替你“编写 Agent”。Agent 还是我们用 Python、FastAPI 和 LangGraph 写的。Docker 负责把它包装成更容易搬运和启动的交付物。</p>
+
+  <div class="warn"><strong>Docker 不能自动解决一切：</strong>代码写错了，装进 Docker 仍然会错；SQLite 只能单机使用，装进 Docker 也不会自动变成分布式数据库；Docker 主要解决的是“怎样把程序稳定地带到另一台机器运行”。</div>
+
+  <h2>只记住这一条主线</h2>
+  <pre><code>项目代码 → 制作镜像 → 启动容器 → 通过 8000 端口访问
+                         ↓
+                    数据保存在卷里</code></pre>
+
+  <div class="quiz">
+    <strong>小测验：</strong>镜像更像“封好的标准餐包”，容器更像什么？
+    <div><button onclick="answer(true)">运行实例</button><button onclick="answer(false)">代码模板</button></div>
+    <div id="feedback" aria-live="polite"></div>
+  </div>
+
+  <p><small>一手资料：<a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker 官方：What is a container?</a>。遇到不懂的词请直接问，不需要先自己背下来。</small></p>
+  <nav>
+    <a href="0005-image-vs-container-and-readiness.html">← 上一课：容器工程边界</a>
+    <a href="../reference/docker-beginner-glossary.html">打开：Docker 白话术语表</a>
+    <a href="0007-sqlite-vs-postgresql-in-plain-chinese.html">下一课：个人抽屉与共享档案室 →</a>
+  </nav>
+</main>
+<script>
+  function answer(correct) {
+    const target = document.getElementById('feedback');
+    target.textContent = correct ? '答对了：镜像是模板，容器是模板启动后正在运行的一份实例。' : '再想想：代码模板还没有真正运行；容器已经有正在工作的程序进程。';
+    target.style.color = correct ? '#11775f' : '#a33a3a';
+  }
+</script>
+</body>
+</html>

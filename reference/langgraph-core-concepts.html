@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LangGraph 核心概念速查</title>
+  <style>
+    :root { color-scheme: light; --ink:#17212b; --muted:#617080; --line:#dce3e8; --accent:#126e62; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:#f6f8f7; }
+    main { max-width:900px; margin:40px auto; padding:42px; background:white; box-shadow:0 8px 30px #17352c12; }
+    h1 { margin-top:0; font-size:2rem; } h2 { margin-top:2rem; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; } th,td { padding:12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-weight:600; } code { background:#eef5f3; padding:.12rem .35rem; border-radius:4px; }
+    .note { border-left:4px solid var(--accent); padding:12px 16px; background:#f0f7f5; }
+    @media print { body { background:white; } main { margin:0; max-width:none; box-shadow:none; } }
+  </style>
+</head>
+<body><main>
+  <h1>LangGraph 核心概念速查</h1>
+  <p>对应 ServiceOps Agent 第一步代码。先掌握状态如何流动，再学习模型和工具。</p>
+  <table>
+    <thead><tr><th>概念</th><th>一句话解释</th><th>项目对应位置</th></tr></thead>
+    <tbody>
+      <tr><td>State</td><td>一次任务在节点之间共享的数据结构。</td><td><code>graph/state.py</code></td></tr>
+      <tr><td>Node</td><td>读取当前状态并返回部分状态更新的函数。</td><td><code>graph/nodes/</code></td></tr>
+      <tr><td>Edge</td><td>声明一个节点完成后应前往哪里。</td><td><code>graph/builder.py</code></td></tr>
+      <tr><td>Conditional Edge</td><td>根据状态动态选择下一条路径。</td><td><code>graph/routes.py</code></td></tr>
+      <tr><td>Reducer</td><td>定义同一状态字段接收多次更新时如何合并。</td><td><code>events: Annotated[..., add]</code></td></tr>
+      <tr><td>Compile</td><td>校验图结构并生成可执行对象。</td><td><code>builder.compile()</code></td></tr>
+    </tbody>
+  </table>
+  <h2>节点的核心约束</h2>
+  <p class="note">节点返回状态增量，不直接修改一个进程级全局字典。这样更容易测试、追踪、重试和恢复。</p>
+  <h2>本阶段安全默认值</h2>
+  <p>分类证据不足时进入人工路径。企业 Agent 的目标不是永远给出回答，而是在不确定时安全退出。</p>
+  <p>权威资料：<a href="https://docs.langchain.com/oss/python/langgraph/graph-api">LangGraph Graph API 官方文档</a></p>
+</main></body>
+</html>

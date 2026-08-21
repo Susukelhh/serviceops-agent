@@ -1,0 +1,18 @@
+[
+  {"case_id":"ground-dev-return-inspection","question":"普通商品只是开盒试用、没有使用痕迹，还能申请退货吗？","evidence_refs":[{"document_id":"KB-RETURN-GENERAL-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","return"]},
+  {"case_id":"ground-dev-custom-regret","question":"刻了名字的耳机没有质量问题，只是后悔了，可以七天退吗？","evidence_refs":[{"document_id":"KB-RETURN-CUSTOM-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","customized"]},
+  {"case_id":"ground-dev-digital-unused","question":"兑换码一直没有展示也没有使用，无法补发时能退款吗？","evidence_refs":[{"document_id":"KB-DIGITAL-GOODS-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","digital"]},
+  {"case_id":"ground-dev-freight-wrong-item","question":"商家发错型号，寄回产生的合理运费由谁承担？","evidence_refs":[{"document_id":"KB-RETURN-FREIGHT-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","freight"]},
+  {"case_id":"ground-dev-warranty-quote","question":"人为损坏需要付费维修时，是不是要先报价再维修？","evidence_refs":[{"document_id":"KB-WARRANTY-GENERAL-001","chunk_indexes":[0,1]}],"should_answer":true,"tags":["answerable","warranty"]},
+  {"case_id":"ground-dev-invoice-issued-wrong","question":"已经生成票号后税号填错，应该怎样更正？","evidence_refs":[{"document_id":"KB-INVOICE-CORRECTION-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","invoice"]},
+  {"case_id":"ground-dev-logistics-missing","question":"物流显示签收但本人没有收到，平台会怎样核查？","evidence_refs":[{"document_id":"KB-LOGISTICS-MISSING-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","logistics"]},
+  {"case_id":"ground-dev-price-competitor","question":"其他平台更便宜，可以按外站价格申请这里的价保吗？","evidence_refs":[{"document_id":"KB-PRICE-PROTECTION-001","chunk_indexes":[0]}],"should_answer":true,"tags":["answerable","pricing"]},
+  {"case_id":"ground-dev-gap-payment","question":"你们支持数字人民币和货到付款吗？","evidence_refs":[{"document_id":"KB-DIGITAL-GOODS-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","regression-from-step27","payment"]},
+  {"case_id":"ground-dev-gap-points","question":"会员积分什么时候清零，每个月能兑换多少优惠券？","evidence_refs":[{"document_id":"KB-DIGITAL-GOODS-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","membership"]},
+  {"case_id":"ground-dev-gap-overseas-warranty","question":"设备带到国外以后是否享受全球联保？","evidence_refs":[{"document_id":"KB-WARRANTY-GENERAL-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","warranty"]},
+  {"case_id":"ground-dev-gap-installation","question":"新买的家电是否提供免费上门安装？","evidence_refs":[{"document_id":"KB-WARRANTY-GENERAL-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","service"]},
+  {"case_id":"ground-dev-gap-special-vat","question":"企业订单能不能开增值税专用发票？","evidence_refs":[{"document_id":"KB-INVOICE-GENERAL-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","invoice"]},
+  {"case_id":"ground-dev-gap-home-pickup","question":"退货时你们能安排快递免费上门取件吗？","evidence_refs":[{"document_id":"KB-RETURN-GENERAL-001","chunk_indexes":[0]},{"document_id":"KB-RETURN-FREIGHT-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","return"]},
+  {"case_id":"ground-dev-gap-weekend-delivery","question":"快递周六周日一定会正常派送吗？","evidence_refs":[{"document_id":"KB-LOGISTICS-DELAY-001","chunk_indexes":[0]}],"should_answer":false,"tags":["knowledge-gap","logistics"]},
+  {"case_id":"ground-dev-gap-loaner","question":"手机送修期间平台会免费提供备用机吗？","evidence_refs":[{"document_id":"KB-WARRANTY-GENERAL-001","chunk_indexes":[0,1]}],"should_answer":false,"tags":["knowledge-gap","warranty"]}
+]

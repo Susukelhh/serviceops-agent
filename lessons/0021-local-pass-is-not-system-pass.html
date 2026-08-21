@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>局部通过，不等于系统通过</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#17232d;--muted:#63727d;--blue:#255ac3;--orange:#b65318;--line:#dce5eb}
+    *{box-sizing:border-box}body{margin:0;background:#eef3f6;color:var(--ink)}main{width:min(980px,calc(100% - 28px));margin:28px auto;padding:38px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 48px rgba(25,45,65,.08)}
+    h1{margin:0;font:700 40px Georgia,"Songti SC",serif}.lead{color:var(--muted);font-size:18px}.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:26px 0}.step{padding:15px 10px;text-align:center;border:1px solid var(--line);border-radius:12px;background:#f7f9fb}.step b{display:block;color:var(--blue);margin-bottom:6px}
+    .story,.practice{padding:20px;border-radius:14px}.story{background:#fff5ed;border-left:4px solid var(--orange)}.practice{margin-top:20px;background:#eef4ff;border-left:4px solid var(--blue)}code{background:#e9eef2;padding:2px 5px;border-radius:5px}a{color:var(--blue)}footer{margin-top:25px;color:var(--muted);font-size:13px}@media(max-width:760px){.flow{grid-template-columns:1fr 1fr}}@media print{body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>局部通过，不等于系统通过</h1>
+  <p class="lead">第21课 · 学会区分“零件测试”和“总装验收”</p>
+  <div class="flow">
+    <div class="step"><b>范围门</b>该不该检索</div>
+    <div class="step"><b>召回</b>找没找到</div>
+    <div class="step"><b>重排</b>顺序是否好</div>
+    <div class="step"><b>充分性</b>能不能回答</div>
+    <div class="step"><b>引用</b>来源是否合法</div>
+  </div>
+  <section class="story">
+    <strong>生活类比：组装电脑</strong>
+    <p>内存、硬盘和显卡各自通过检测，不代表整机一定能开机。接口不兼容、供电不足和机箱空间不够，只有装到一起才会暴露。RAG也是一样：第29步刚运行离线总装，就发现Top-5长证据让旧回答器超过2000字符答案上限。</p>
+  </section>
+  <h2>遇到失败先问哪一层？</h2>
+  <p>如果正确文档没进Top-K，应该优化Embedding、Chunk或召回；如果正确文档已经召回但模型仍乱答，应该优化证据充分性、提示和拒答门。两者不能用同一个“RAG效果不好”糊弄过去。</p>
+  <section class="practice">
+    <strong>30秒检索练习</strong>
+    <p>问题命中了“数字商品规则”，但用户问的是“是否支持数字人民币”。正确文档不在知识库中，回答器却自动回答。这个错误主要属于哪层？先在心里回答，再看答案：<code>证据充分性/最终拒答层</code>，因为检索得到的只是相似文档，并不蕴含答案。</p>
+  </section>
+  <p>继续查看：<a href="../reference/grounding-sufficiency-interview-card.html">证据充分性面试卡</a> · <a href="../docs/steps/29-end-to-end-rag-promotion-gate.md">第29步完整实验</a></p>
+  <footer>主要资料：<a href="https://docs.langchain.com/oss/python/langchain/retrieval">LangChain Retrieval</a>。如果“召回失败”和“回答失败”的区别仍不清楚，请直接向我追问一个具体Bad Case。</footer>
+</main>
+</body>
+</html>

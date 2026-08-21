@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第十二课：Agent 控制台展示什么</title>
+  <style>
+    :root { color-scheme:light; --ink:#17251f; --muted:#63716a; --green:#19865f; --deep:#10271f; --amber:#b76b16; --line:#d8e1dc; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(145deg,#edf5f0,#fff9ef 55%,#edf3fb); font:17px/1.72 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(980px,calc(100% - 30px)); margin:32px auto; padding:clamp(23px,5vw,56px); border:1px solid var(--line); border-radius:22px; background:rgba(255,255,255,.97); box-shadow:0 20px 65px rgba(24,48,37,.12); }
+    h1 { margin:.15em 0 .35em; font:800 clamp(34px,6vw,55px)/1.12 Georgia,"Songti SC",serif; letter-spacing:-.035em; }
+    h2 { margin:2em 0 .55em; font-size:1.42rem; }
+    .eyebrow { color:var(--green); font-weight:780; letter-spacing:.08em; }
+    .lead { color:var(--muted); font-size:1.12rem; }
+    .answer { padding:16px 20px; border-left:5px solid var(--green); border-radius:10px; background:#eaf7f1; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; margin:20px 0; }
+    .card { padding:19px; border:1px solid var(--line); border-radius:16px; background:#fffdfa; }
+    .card h3 { margin:0 0 8px; color:var(--green); }
+    pre { overflow:auto; padding:18px; border-radius:14px; color:#f0f8f4; background:var(--deep); line-height:1.6; }
+    code { padding:.12em .4em; border-radius:6px; background:#eef2ef; }
+    .warn { padding:16px 20px; border-left:5px solid var(--amber); border-radius:10px; background:#fff3df; }
+    .interview { padding:18px; border:1px solid #cbd9d2; border-radius:14px; background:#f0f7f3; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:11px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    nav { display:flex; flex-wrap:wrap; gap:16px; margin-top:32px; padding-top:18px; border-top:1px solid var(--line); }
+    a { color:var(--green); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:760px) { .grid { grid-template-columns:1fr; } main { margin:14px auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 第 20 步配套课</div>
+  <h1>为什么一个聊天框讲不清 Agent？</h1>
+  <p class="lead">普通聊天框只让你看见答案，真正的 Agent 项目还要让人看懂路由、工具、证据、暂停和安全边界。</p>
+
+  <div class="answer"><strong>先记住结论：</strong>好的演示页面不是给 Agent 穿一件漂亮外套，而是把后端已经产生的可信证据排成一条看得懂的流水线。</div>
+
+  <h2>控制台三块区域像什么</h2>
+  <div class="grid">
+    <section class="card"><h3>左侧 · 值班看板</h3><p>告诉你 API、状态档案、退货库、Outbox 和审计库是不是都能工作。</p></section>
+    <section class="card"><h3>中间 · 服务窗口</h3><p>用户提交问题、查看答案和引用；需要退货时在这里等待审批。</p></section>
+    <section class="card"><h3>右侧 · 流水线灯板</h3><p>按顺序显示认证、分类、检索、规划、工具和响应等公开业务事件。</p></section>
+  </div>
+
+  <h2>右侧时间线是不是模型思维链</h2>
+  <p>不是。它展示的是开发者主动定义的业务事件，例如 <code>身份已验证</code>、<code>订单工具查询成功</code>。
+  模型隐藏的逐字推理不会出现在页面里。面试时应使用“可审计执行轨迹”这个说法，而不是“暴露思维链”。</p>
+
+  <pre><code>用户：查询订单 SO100001
+  ↓ JWT sub 绑定 user-001
+  ↓ 分类为 order_status
+  ↓ 规划器选择 get_order_status
+  ↓ 工具再次检查订单归属
+  ↓ 观察到“已发货”
+  ↓ 生成用户回答</code></pre>
+
+  <h2>为什么现在要粘贴四枚 Token</h2>
+  <table>
+    <thead><tr><th>身份</th><th>能做什么</th><th>不能做什么</th></tr></thead>
+    <tbody>
+      <tr><td>普通用户</td><td>提交售后对话</td><td>不能批准退货或读审计</td></tr>
+      <tr><td>审批人</td><td>批准/拒绝退货草案</td><td>不能冒充用户查询订单</td></tr>
+      <tr><td>审计员</td><td>验证审批哈希链</td><td>不能批准自己的操作</td></tr>
+      <tr><td>开发调试</td><td>读取脱敏 Checkpoint 回放</td><td>不能调用业务、审批或审计接口</td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn"><strong>别为了“一键演示”打安全折扣：</strong>如果身份下拉框可以直接获得所有高权限 Token，项目就多了一个认证后门。当前 Token 只在网页内存里，刷新即消失。</div>
+
+  <h2>打开控制台</h2>
+  <pre><code>docker compose up --detach --build --wait --wait-timeout 120
+uv run python examples/09_generate_dev_tokens.py
+
+浏览器打开：http://127.0.0.1:8000/</code></pre>
+
+  <h2>面试时怎么说</h2>
+  <div class="interview"><strong>可直接回答：</strong>“我没有另做一套假演示数据。控制台直接调用现有JWT保护的chat、approval、audit和development debug接口，并读取health/readiness。快速时间线来自公开events；教学模式通过aget_state_history读取脱敏StateSnapshot并计算字段差异，不推断模型思维链。退货只有真实返回LangGraph interrupt才出现审批卡，恢复使用原thread_id。四类Token只存在页面内存，动态文本全部用textContent，并通过同源CSP限制脚本、样式和网络连接。”</div>
+
+  <p><small>当前求职阶段要会演示四条主线和解释安全取舍，不需要深入学习复杂前端框架。</small></p>
+
+  <nav>
+    <a href="0011-backup-restore-in-plain-chinese.html">← 上一课：备份与恢复</a>
+    <a href="http://127.0.0.1:8000/console/">打开：本地 Agent 控制台</a>
+    <a href="0013-checkpoint-playback-in-plain-chinese.html">下一课：Checkpoint 回放 →</a>
+    <a href="../docs/steps/20-agent-execution-console.md">阅读：完整实施记录</a>
+  </nav>
+</main>
+</body>
+</html>

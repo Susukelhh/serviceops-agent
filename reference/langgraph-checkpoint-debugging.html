@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LangGraph Checkpoint 调试速查</title>
+  <style>
+    :root { --ink:#17251f; --muted:#627069; --green:#19865f; --line:#d8e1dc; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:#edf3ef; font:15px/1.62 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(1020px,calc(100% - 28px)); margin:28px auto; padding:34px; border:1px solid var(--line); border-radius:18px; background:#fff; }
+    h1 { margin:0 0 8px; font:800 36px/1.15 Georgia,"Songti SC",serif; } h2 { margin:28px 0 8px; color:var(--green); }
+    p { color:var(--muted); } table { width:100%; border-collapse:collapse; } th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    code { padding:2px 5px; border-radius:5px; background:#edf3ef; } .formula { padding:15px; border-left:4px solid var(--green); background:#edf7f2; }
+    a { color:var(--green); } @media print { body { background:#fff; } main { width:100%; margin:0; border:0; } }
+  </style>
+</head>
+<body><main>
+  <h1>LangGraph Checkpoint 调试速查</h1>
+  <p class="formula"><strong>State = 当前工作单；Checkpoint = super-step 边界的工作单快照；thread_id = 一组快照的档案袋编号。</strong></p>
+  <h2>StateSnapshot 字段</h2>
+  <table><thead><tr><th>字段</th><th>白话</th><th>本项目用途</th></tr></thead><tbody>
+    <tr><td><code>values</code></td><td>当前全部状态</td><td>字段白名单后展示当前状态并计算差异</td></tr>
+    <tr><td><code>next</code></td><td>接下来要去的节点</td><td>解释条件边结果；空元组表示结束</td></tr>
+    <tr><td><code>config</code></td><td>快照与线程编号</td><td>读取 checkpoint_id 和 thread_id</td></tr>
+    <tr><td><code>metadata</code></td><td>快照来源与步数</td><td>展示 source 和 super-step</td></tr>
+    <tr><td><code>created_at</code></td><td>拍照时间</td><td>按时间解释执行顺序</td></tr>
+    <tr><td><code>parent_config</code></td><td>上一张照片</td><td>展示父 checkpoint_id</td></tr>
+    <tr><td><code>tasks</code></td><td>待执行任务</td><td>识别节点错误与任务上的 interrupt</td></tr>
+    <tr><td><code>interrupts</code></td><td>暂停说明</td><td>证明退货写工具前已经暂停</td></tr>
+  </tbody></table>
+  <h2>常用 API</h2>
+  <table><tbody>
+    <tr><td><code>graph.aget_state(config)</code></td><td>异步读取线程最新快照</td></tr>
+    <tr><td><code>graph.aget_state_history(config)</code></td><td>异步读取历史；官方返回最新快照在前</td></tr>
+    <tr><td><code>Command(resume=value)</code></td><td>使用同一 thread_id 从 interrupt 继续</td></tr>
+  </tbody></table>
+  <h2>面试提醒</h2>
+  <ul><li>Checkpoint 边界是 super-step，不要绝对化为“一节点一快照”。</li><li>工程轨迹不是隐藏思维链；展示结构化结论、工具观察和真实 next。</li><li>应用层优先使用公开状态 API，不直接依赖 Checkpointer 私有表。</li><li>生产调试必须做权限、脱敏、保留期限和环境关闭门。</li></ul>
+  <p>来源：<a href="https://docs.langchain.com/oss/python/langgraph/persistence">LangGraph Persistence 官方文档</a></p>
+</main></body>
+</html>

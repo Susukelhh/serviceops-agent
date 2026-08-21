@@ -1,0 +1,27 @@
+{
+  "experiment_id": "serviceops-rag-candidate-reranking",
+  "version": "1.0.0",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_path": "data/experiments/rag_v2/ranking_development_cases.json",
+  "holdout_dataset_path": "data/experiments/rag_v2/ranking_holdout_cases.json",
+  "embedding_dimensions": 1024,
+  "chunk_size": 500,
+  "chunk_overlap": 80,
+  "score_threshold": 0.10,
+  "candidate_k": 5,
+  "top_k": 5,
+  "lexical_weight_candidates": [0.25, 0.50, 0.75, 1.00],
+  "frozen_candidate_profile_id": "bm25-fusion-0.25",
+  "development_gate": {
+    "min_recall_at_k": 0.95,
+    "min_top_1_accuracy": 0.85,
+    "min_mrr_at_k": 0.90,
+    "min_top_1_gain": 0.10
+  },
+  "holdout_gate": {
+    "min_recall_at_k": 0.90,
+    "min_top_1_accuracy": 0.80,
+    "min_mrr_at_k": 0.85,
+    "min_top_1_gain": 0.05
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "experiment_id": "serviceops-grounding-sufficiency-candidate",
+  "version": "1.0.0",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_path": "data/experiments/grounding_v1/development_cases.json",
+  "holdout_dataset_path": "data/experiments/grounding_v1/holdout_cases.json",
+  "holdout_case_count": 10,
+  "chunk_size": 500,
+  "chunk_overlap": 80,
+  "candidate_profile_id": "qwen-grounded-answer-v1",
+  "frozen_prompt_sha256": "1c5a43de5b8f50dc4849911527fc233aa0b6aefa0197697b18382e2b48ccad4d",
+  "development_gate": {
+    "min_answerable_recall": 0.875,
+    "min_abstention_accuracy": 0.875,
+    "min_decision_accuracy": 0.875,
+    "max_unsupported_answer_rate": 0.125,
+    "min_citation_validity": 1.0
+  },
+  "holdout_gate": {
+    "min_answerable_recall": 0.80,
+    "min_abstention_accuracy": 0.80,
+    "min_decision_accuracy": 0.80,
+    "max_unsupported_answer_rate": 0.20,
+    "min_citation_validity": 1.0
+  }
+}

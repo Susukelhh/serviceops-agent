@@ -1,0 +1,98 @@
+# 真实千问实验与普通 CI 分开，避免 Push/PR 自动消耗额度或把模型波动当代码回归。
+name: ServiceOps Qwen candidate experiment
+
+on:
+  # 只有仓库成员在 Actions 页面明确点击 Run workflow 才能启动付费候选实验。
+  workflow_dispatch:
+    inputs:
+      trials:
+        # 轮数显示在手工运行表单中；3 轮是当前默认稳定性证据。
+        description: Number of repeated Qwen candidate trials
+        required: true
+        default: "3"
+        type: choice
+        options:
+          - "1"
+          - "3"
+          - "5"
+
+# 候选实验只读取仓库；API Key 通过 Secret 注入，不需要任何 GITHUB_TOKEN 写权限。
+permissions:
+  contents: read
+
+# 真实候选不自动取消正在运行的旧任务，避免已经产生费用后丢失最终报告。
+concurrency:
+  group: qwen-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate-evaluation:
+    name: Repeated Qwen candidate evaluation
+    runs-on: ubuntu-latest
+    # 多轮远程模型调用可能受限流影响，但仍设置总上限防止无限挂起。
+    timeout-minutes: 45
+    env:
+      PYTHONUTF8: "1"
+      PYTHONUNBUFFERED: "1"
+      # Secret 只进入当前 Job 环境；脚本和报告均不会回显该字段。
+      SERVICEOPS_LLM_API_KEY: ${{ secrets.SERVICEOPS_LLM_API_KEY }}
+      # Repository Variable 可覆盖模型；未设置时使用阿里云官方稳定别名 qwen-plus。
+      SERVICEOPS_LLM_MODEL: ${{ vars.SERVICEOPS_LLM_MODEL || 'qwen-plus' }}
+      # Repository Variable 可覆盖地域地址；默认是中国大陆北京 OpenAI 兼容入口。
+      SERVICEOPS_LLM_BASE_URL: ${{ vars.SERVICEOPS_LLM_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1' }}
+      # 以下非密钥配置与代码中的候选 profile 保持一致。
+      SERVICEOPS_ENVIRONMENT: test
+      SERVICEOPS_LLM_BACKEND: openai_compatible
+      SERVICEOPS_AGENT_PLANNER_BACKEND: llm
+      SERVICEOPS_EMBEDDING_BACKEND: hash
+      SERVICEOPS_RAG_GENERATION_BACKEND: llm
+      SERVICEOPS_QDRANT_LOCATION: ":memory:"
+      SERVICEOPS_PERSISTENCE_BACKEND: memory
+      SERVICEOPS_TELEMETRY_ENABLED: "false"
+    steps:
+      # 固定完整 SHA 避免可移动 tag 在拥有 Secret 的工作流中引入供应链漂移。
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # uv Action 与工具版本都锁定，候选之间只保留模型这一主要变量。
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install pinned Python
+        run: uv python install 3.12
+
+      - name: Sync locked dependencies
+        run: uv sync --frozen --all-groups
+
+      # 只检查 Secret 是否存在，绝不输出其长度、前缀或内容。
+      - name: Verify Qwen API secret exists
+        shell: bash
+        run: |
+          if [ -z "$SERVICEOPS_LLM_API_KEY" ]; then
+            echo "Missing repository secret: SERVICEOPS_LLM_API_KEY"
+            exit 2
+          fi
+
+      # confirm 开关表明这是自动化系统中经过明确授权的真实付费调用。
+      - name: Run repeated Qwen candidate experiment
+        run: >-
+          uv run --frozen python examples/14_qwen_candidate_experiment.py
+          --confirm-paid-api
+          --trials "${{ inputs.trials }}"
+          --report data/runtime/qwen_candidate_experiment_report.json
+
+      # 晋级失败仍上传完整逐轮报告，方便分析哪条 case、哪一层出现波动。
+      - name: Upload Qwen candidate report
+        if: ${{ always() && hashFiles('data/runtime/qwen_candidate_experiment_report.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qwen-candidate-evaluation-${{ github.run_id }}
+          path: data/runtime/qwen_candidate_experiment_report.json
+          if-no-files-found: error
+          retention-days: 14

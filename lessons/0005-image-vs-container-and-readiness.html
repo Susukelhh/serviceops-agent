@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第五课：镜像、容器与 Readiness</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#5d6679; --paper:#fbfaf7; --card:#fff; --line:#dfe3ea; --blue:#2457d6; --green:#147d64; --orange:#b45a18; --red:#a33a3a; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(135deg,#eef3ff 0,#fbfaf7 48%,#fff0e7 100%); color:var(--ink); font:17px/1.72 ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(960px,calc(100% - 32px)); margin:40px auto; background:rgba(255,255,255,.95); border:1px solid var(--line); border-radius:22px; box-shadow:0 22px 70px rgba(38,55,92,.12); padding:clamp(24px,5vw,58px); }
+    .eyebrow { color:var(--blue); font-weight:760; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { font:800 clamp(34px,6vw,58px)/1.08 ui-serif,Georgia,"Songti SC",serif; margin:.25em 0; letter-spacing:-.035em; }
+    h2 { margin:2.1em 0 .55em; font-size:1.45rem; }
+    p { margin:.7em 0; }
+    .lead { color:var(--muted); font-size:1.13rem; max-width:780px; }
+    .mission { border-left:5px solid var(--green); background:#eef9f4; padding:15px 20px; border-radius:10px; }
+    .flow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; margin:20px 0; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; position:relative; }
+    .card:not(:last-child)::after { content:'→'; position:absolute; right:-14px; top:42%; color:var(--blue); font-size:25px; z-index:2; }
+    .card h3 { margin:0 0 7px; color:var(--blue); }
+    code { background:#f0f3f8; border-radius:6px; padding:.13em .4em; font-size:.92em; }
+    pre { overflow:auto; background:#111827; color:#eef2ff; border-radius:14px; padding:18px; line-height:1.55; }
+    table { border-collapse:collapse; width:100%; font-size:.94rem; }
+    th,td { border-bottom:1px solid var(--line); padding:11px 9px; text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    .quiz { background:#f7f8fc; border:1px solid var(--line); border-radius:16px; padding:20px; margin:18px 0; }
+    button { border:1px solid #b8c2d8; background:white; color:var(--ink); border-radius:999px; padding:8px 18px; margin:7px 7px 0 0; cursor:pointer; font:inherit; }
+    button:hover { border-color:var(--blue); color:var(--blue); }
+    .feedback { min-height:1.7em; margin-top:9px; font-weight:700; }
+    .good { color:var(--green); } .bad { color:var(--red); }
+    .recall { border:2px dashed var(--orange); background:#fff8ed; border-radius:16px; padding:21px; }
+    nav { margin-top:34px; padding-top:20px; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; gap:16px; }
+    a { color:var(--blue); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:720px) { .flow { grid-template-columns:1fr; } .card:not(:last-child)::after { content:'↓'; right:48%; top:auto; bottom:-23px; } main { margin:16px auto; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } button { display:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 约 9 分钟</div>
+  <h1>镜像不是进程活着，Readiness 也不是端口打开</h1>
+  <p class="lead">今天的胜利目标：你能解释镜像如何生成容器、为什么应用不能以 root 运行，以及 <code>/health</code> 和 <code>/ready</code> 各自回答什么问题。</p>
+
+  <div class="mission"><strong>为什么这对求职重要：</strong>面试官说“你这个 Agent 怎么部署”时，答案不能停在“运行 Uvicorn”。企业交付要能说明可复现构建、密钥边界、运行权限、持久化与流量探针。</div>
+
+  <h2>先分清三个对象</h2>
+  <div class="flow">
+    <section class="card"><h3>源码仓库</h3><p>代码、<code>pyproject.toml</code>、<code>uv.lock</code> 与只读种子数据，是构建输入。</p></section>
+    <section class="card"><h3>镜像 Image</h3><p>不可变的文件系统模板，包含固定 Python、生产依赖和已安装应用，但不包含本机 <code>.env</code>。</p></section>
+    <section class="card"><h3>容器 Container</h3><p>镜像的一次运行实例，拥有进程、临时层、运行配置和挂载卷。</p></section>
+  </div>
+  <p>同一镜像可以创建多个容器，但当前 ServiceOps 的 SQLite 状态不能支持随意多副本。交付单元可复制，不代表状态层已经分布式化。</p>
+
+  <h2>为什么使用多阶段构建</h2>
+  <pre><code>builder: Python + 固定 uv + 下载缓存 + 编译/安装
+                 │ 只复制 /app/.venv
+runtime: Python + .venv + data/seed + 非 root 用户</code></pre>
+  <p>构建工具可以进入 builder，但不会进入最终 runtime。这样运行镜像更小、攻击面更清晰，也避免把测试依赖、源码工作区和下载缓存带到生产进程旁边。</p>
+
+  <h2>两种健康问题不能混在一起</h2>
+  <table>
+    <thead><tr><th>探针</th><th>回答的问题</th><th>ServiceOps 行为</th></tr></thead>
+    <tbody>
+      <tr><td><code>/health</code></td><td>HTTP 进程是否还活着？</td><td>轻量返回 <code>ok</code>，不访问数据库。</td></tr>
+      <tr><td><code>/ready</code></td><td>现在是否应该接收业务流量？</td><td>读取 Checkpointer、业务库、Outbox 和审计库，任一失败返回 503。</td></tr>
+    </tbody>
+  </table>
+  <p>数据库暂时不可用时，进程仍可能活着并可输出日志。正确动作是先从流量池摘除，而不是把“端口可连接”误当成“Agent 可工作”。</p>
+
+  <h2>四条运行边界</h2>
+  <ol>
+    <li><strong>非 root：</strong>固定 UID/GID 10001，降低依赖漏洞被利用后的权限。</li>
+    <li><strong>只读根目录：</strong>只有 <code>/app/data/runtime</code> 卷可以保存 SQLite。</li>
+    <li><strong>不烘焙密钥：</strong><code>.dockerignore</code> 在构建上下文入口排除 <code>.env</code>。</li>
+    <li><strong>单 worker：</strong>当前 SQLite 是单节点边界；要横向扩展先迁移 PostgreSQL。</li>
+  </ol>
+
+  <h2>即时判断</h2>
+  <div class="quiz">
+    <strong>判断 1：</strong>只要容器 8000 端口能连接，就可以继续把 Agent 请求分给它。
+    <div><button onclick="answer('q1',false)">正确</button><button onclick="answer('q1',true)">错误</button></div>
+    <div id="q1" class="feedback" aria-live="polite"></div>
+  </div>
+  <div class="quiz">
+    <strong>判断 2：</strong>当前 Compose 可以证明单机容器交付，但不能证明 SQLite 架构已支持生产多副本。
+    <div><button onclick="answer('q2',true)">正确</button><button onclick="answer('q2',false)">错误</button></div>
+    <div id="q2" class="feedback" aria-live="polite"></div>
+  </div>
+
+  <h2>在代码里找到证据</h2>
+  <ol>
+    <li>打开 <code>Dockerfile</code>，找到 builder/runtime、<code>USER 10001:10001</code> 和单 worker。</li>
+    <li>打开 <code>.dockerignore</code>，确认 <code>.env</code>、<code>.venv</code>、<code>data/runtime</code> 不进入构建上下文。</li>
+    <li>打开 <code>compose.yaml</code>，找到只读根目录、具名卷、全部 Capability 删除和 <code>/ready</code>。</li>
+    <li>安装 Docker 后运行示例 15，观察 liveness、四依赖 readiness 和未认证 401 三层结果。</li>
+  </ol>
+
+  <div class="recall">
+    <strong>闭卷复述（请回到对话回答）：</strong>
+    <p>多阶段构建解决什么问题？为什么 ServiceOps 的容器健康检查选择 <code>/ready</code>？当前为什么坚持一个容器一个 Uvicorn worker？</p>
+  </div>
+
+  <p><small>首选一手资料：<a href="https://fastapi.tiangolo.com/deployment/docker/">FastAPI Docker deployment</a> 与 <a href="https://docs.docker.com/build/building/multi-stage/">Docker multi-stage builds</a>。</small></p>
+  <nav>
+    <a href="0004-two-quality-gates.html">← 上一课：两道质量门</a>
+    <a href="../reference/container-deployment-checklist.html">打开：容器部署速查表</a>
+    <a href="0006-docker-in-plain-chinese.html">零基础补充：用开餐厅理解 Docker →</a>
+  </nav>
+</main>
+<script>
+  function answer(id, isCorrect) {
+    const target = document.getElementById(id);
+    if (isCorrect) {
+      target.textContent = '答对了：你已经把交付单元、进程存活和接流量条件分开了。';
+      target.className = 'feedback good';
+    } else {
+      target.textContent = '再想一步：端口打开不代表四个持久化依赖可读，单机 SQLite 也不等于分布式状态层。';
+      target.className = 'feedback bad';
+    }
+  }
+</script>
+</body>
+</html>

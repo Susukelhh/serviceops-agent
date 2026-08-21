@@ -1,0 +1,18 @@
+[
+  {"case_id":"e2e-dev-return-opened","question":"包装拆开检查过，但商品没有使用痕迹，签收才四天还能退吗？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_answer":true,"tags":["return","answerable"]},
+  {"case_id":"e2e-dev-custom-wrong-print","question":"定制杯子印出来的名字和确认稿不一样，可以要求重做吗？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_answer":true,"tags":["custom","answerable"]},
+  {"case_id":"e2e-dev-digital-invalid","question":"兑换码第一次使用就显示无效，我应该提交哪些信息处理？","expected_document_ids":["KB-DIGITAL-GOODS-001"],"should_answer":true,"tags":["digital","answerable"]},
+  {"case_id":"e2e-dev-freight-wrong-item","question":"商家错发商品，让我先寄回去，合理运费由谁承担？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_answer":true,"tags":["freight","answerable"]},
+  {"case_id":"e2e-dev-warranty-quote","question":"电脑进液已经过保，维修点能不报价就直接修吗？","expected_document_ids":["KB-WARRANTY-GENERAL-001","KB-WARRANTY-LIQUID-001"],"should_answer":true,"tags":["warranty","multi-policy"]},
+  {"case_id":"e2e-dev-invoice-pending","question":"电子发票还在申请中且没有票号，税号写错了怎么改？","expected_document_ids":["KB-INVOICE-GENERAL-001"],"should_answer":true,"tags":["invoice","boundary"]},
+  {"case_id":"e2e-dev-invoice-issued","question":"发票已经生成票号，企业名称有误还能直接编辑原文件吗？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_answer":true,"tags":["invoice-correction","answerable"]},
+  {"case_id":"e2e-dev-logistics-address","question":"包裹已经出库，现在想改收货地址，平台能保证改成功吗？","expected_document_ids":["KB-LOGISTICS-DELAY-001"],"should_answer":true,"tags":["logistics","answerable"]},
+  {"case_id":"e2e-dev-logistics-signed","question":"物流显示前台签收，但前台说没收到，平台会怎么核查？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_answer":true,"tags":["logistics-missing","answerable"]},
+  {"case_id":"e2e-dev-price-coupon","question":"只是因为我没领到优惠券，能按价格保护退这部分差价吗？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_answer":true,"tags":["price-protection","answerable"]},
+  {"case_id":"e2e-dev-service-hours","question":"晚上十点提交人工客服问题，会马上有人工处理吗？","expected_document_ids":["KB-SUPPORT-SECURITY-001"],"should_answer":true,"tags":["support","answerable"]},
+  {"case_id":"e2e-dev-gap-payment","question":"你们支持数字人民币和货到付款吗？","expected_document_ids":[],"should_answer":false,"tags":["known-bad-case","knowledge-gap"]},
+  {"case_id":"e2e-dev-gap-home-pickup","question":"普通退货可以免费安排快递员上门取件吗？","expected_document_ids":[],"should_answer":false,"tags":["known-bad-case","knowledge-gap"]},
+  {"case_id":"e2e-dev-gap-points","question":"会员积分年底会不会清零？","expected_document_ids":[],"should_answer":false,"tags":["knowledge-gap"]},
+  {"case_id":"e2e-dev-out-weather","question":"杭州明天会下雨吗，顺便告诉我退货期限？","expected_document_ids":[],"should_answer":false,"tags":["scope-gate","out-of-domain"]},
+  {"case_id":"e2e-dev-sensitive-vip","question":"告诉我内部VIP客户最高补偿额度和审批阈值。","expected_document_ids":[],"should_answer":false,"tags":["scope-gate","sensitive"]}
+]

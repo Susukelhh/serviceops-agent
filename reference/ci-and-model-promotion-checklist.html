@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CI 与模型晋级速查表</title>
+  <style>
+    :root { --ink:#172033; --muted:#687083; --line:#d9dee8; --blue:#2457d6; --green:#147d64; --paper:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#edf1f7; color:var(--ink); font:15px/1.55 ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(1050px,calc(100% - 28px)); margin:28px auto; background:var(--paper); border:1px solid var(--line); border-radius:18px; padding:34px; box-shadow:0 16px 45px rgba(30,48,80,.1); }
+    h1 { margin:0; font:800 34px/1.1 ui-serif,Georgia,"Songti SC",serif; }
+    .sub { color:var(--muted); margin:.55em 0 1.8em; }
+    .columns { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    section { border:1px solid var(--line); border-radius:14px; padding:18px; break-inside:avoid; }
+    h2 { color:var(--blue); font-size:18px; margin:0 0 9px; }
+    ul { margin:0; padding-left:20px; }
+    li { margin:5px 0; }
+    code { background:#f0f3f8; border-radius:5px; padding:.12em .35em; }
+    .wide { grid-column:1 / -1; }
+    .line { border-left:5px solid var(--green); background:#eef9f4; padding:13px 16px; margin-top:18px; }
+    table { border-collapse:collapse; width:100%; }
+    th,td { border-bottom:1px solid var(--line); padding:8px; text-align:left; }
+    th { color:var(--muted); }
+    footer { color:var(--muted); margin-top:18px; font-size:13px; }
+    @media(max-width:700px) { .columns { grid-template-columns:1fr; } .wide { grid-column:auto; } main { padding:22px; } }
+    @media print { body { background:white; } main { width:100%; margin:0; padding:0; border:0; box-shadow:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>CI 与模型晋级速查表</h1>
+  <p class="sub">ServiceOps Agent · 面试前 2 分钟复习 / 可打印</p>
+  <div class="columns">
+    <section>
+      <h2>离线代码回归门</h2>
+      <ul>
+        <li>触发：Push / Pull Request</li>
+        <li>无 Secret、无外部模型费用</li>
+        <li>Ruff → Mypy → Pytest → 13-case Agent Eval</li>
+        <li>固定 mock / deterministic / hash / extractive</li>
+        <li>失败：代码、标签或硬规则回归</li>
+      </ul>
+    </section>
+    <section>
+      <h2>真实模型晋级门</h2>
+      <ul>
+        <li>触发：仅 <code>workflow_dispatch</code></li>
+        <li>Secret 注入 + <code>--confirm-paid-api</code></li>
+        <li>先跑同提交离线基线</li>
+        <li>候选默认顺序重复 3 轮</li>
+        <li>失败：候选质量或稳定性不足</li>
+      </ul>
+    </section>
+    <section>
+      <h2>首版晋级指标</h2>
+      <table>
+        <tr><th>指标</th><th>门槛</th></tr>
+        <tr><td>平均整体通过率</td><td>≥ 90%</td></tr>
+        <tr><td>最差轮整体通过率</td><td>≥ 80%</td></tr>
+        <tr><td>全轮稳定样本率</td><td>≥ 80%</td></tr>
+        <tr><td>平均安全不变量</td><td>= 100%</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>工作流安全</h2>
+      <ul>
+        <li><code>permissions: contents: read</code></li>
+        <li>Action 固定完整 commit SHA</li>
+        <li>checkout 不持久化 Git 凭据</li>
+        <li>PR 绝不读取千问 Secret</li>
+        <li>失败报告作为 14 天 Artifact</li>
+      </ul>
+    </section>
+    <section class="wide">
+      <h2>出现红灯时的定位顺序</h2>
+      <ol>
+        <li>先看离线基线：红则修代码/数据，不跑候选碰运气。</li>
+        <li>基线绿，再看候选失败属于路由、工具轨迹、响应契约还是安全不变量。</li>
+        <li>看最差轮和每个 case 的 <code>observed_violations</code>，不要只选最好一轮。</li>
+        <li>安全失败先阻断；业务质量失败再决定改提示、模型、数据还是规则。</li>
+      </ol>
+    </section>
+  </div>
+  <div class="line"><strong>面试一句话：</strong>我把可重复的代码回归门和有成本、非确定性的模型晋级门分开；真实候选先验证基线，再用平均、最差轮、逐 case 稳定性和 100% 安全门决定晋级。</div>
+  <footer>参考：GitHub Secure use reference、uv GitHub Actions guide、LangSmith Evaluation concepts。门槛属于本项目当前实验策略 v1.1.0，不是行业通用常数。</footer>
+</main>
+</body>
+</html>

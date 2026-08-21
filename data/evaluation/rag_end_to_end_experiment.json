@@ -1,0 +1,39 @@
+{
+  "experiment_id": "serviceops-rag-end-to-end-candidate",
+  "version": "1.0.0",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_path": "data/experiments/rag_end_to_end_v1/development_cases.json",
+  "holdout_dataset_path": "data/experiments/rag_end_to_end_v1/holdout_cases.json",
+  "holdout_case_count": 12,
+  "chunk_size": 500,
+  "chunk_overlap": 80,
+  "candidate_k": 5,
+  "top_k": 5,
+  "baseline_embedding_dimensions": 1024,
+  "baseline_score_threshold": 0.10,
+  "candidate_embedding_model": "qwen3.7-text-embedding",
+  "candidate_embedding_dimensions": 1024,
+  "candidate_embedding_batch_size": 20,
+  "candidate_score_threshold": 0.50,
+  "bm25_lexical_weight": 0.25,
+  "candidate_profile_id": "qwen-e2e-rag-v1",
+  "frozen_candidate_fingerprint": "197c37b7c7e888a685eb5e4d1a79b99b648da11f04311cdbe1a52bd61f649f47",
+  "development_gate": {
+    "min_retrieval_recall": 0.85,
+    "min_top_1_accuracy": 0.75,
+    "min_answerable_recall": 0.80,
+    "min_abstention_accuracy": 0.80,
+    "min_decision_accuracy": 0.80,
+    "max_unsupported_answer_rate": 0.20,
+    "min_citation_validity": 1.0
+  },
+  "holdout_gate": {
+    "min_retrieval_recall": 0.80,
+    "min_top_1_accuracy": 0.70,
+    "min_answerable_recall": 0.75,
+    "min_abstention_accuracy": 0.75,
+    "min_decision_accuracy": 0.75,
+    "max_unsupported_answer_rate": 0.25,
+    "min_citation_validity": 1.0
+  }
+}

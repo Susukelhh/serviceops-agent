@@ -1,0 +1,24 @@
+{
+  "experiment_id": "serviceops-rag-scope-gate",
+  "version": "1.0.0",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_path": "data/experiments/rag_v2/development_cases.json",
+  "holdout_dataset_path": "data/experiments/rag_v2/holdout_cases.json",
+  "embedding_dimensions": 1024,
+  "chunk_size": 500,
+  "chunk_overlap": 80,
+  "top_k": 5,
+  "threshold_candidates": [0.10, 0.15, 0.20, 0.25, 0.30, 0.35],
+  "scope_candidate_threshold": 0.10,
+  "frozen_candidate_profile_id": "scope-gate-v1-threshold-0.10",
+  "development_gate": {
+    "min_recall_at_k": 0.95,
+    "min_decision_accuracy": 0.90,
+    "max_false_positive_rate": 0.25
+  },
+  "holdout_gate": {
+    "min_recall_at_k": 0.90,
+    "min_decision_accuracy": 0.85,
+    "max_false_positive_rate": 0.25
+  }
+}

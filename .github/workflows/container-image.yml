@@ -1,0 +1,176 @@
+# 该工作流验证 Dockerfile 真能构建和启动，弥补开发机暂未安装 Docker 的本地验证缺口。
+name: ServiceOps container image gate
+
+# 普通提交和 Pull Request 都不读取 Secret，只构建默认零费用镜像。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Docker 构建和本机容器运行只需读取仓库，GITHUB_TOKEN 不需要写权限。
+permissions:
+  contents: read
+
+# 同一分支的新提交取消旧镜像构建，节省 Runner 时间。
+concurrency:
+  group: container-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container-contract:
+    # 该名称适合作为分支保护中的独立必需检查。
+    name: Build, run and probe container
+    # GitHub 托管 Ubuntu Runner 预装 Docker Engine。
+    runs-on: ubuntu-latest
+    # 防止镜像仓库或健康检查异常时无限占用 Runner。
+    timeout-minutes: 20
+    steps:
+      # 与其他质量门一致，Action 固定完整提交 SHA 且不保留 Git 凭据。
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # --pull 会重新核对 Dockerfile 中固定摘要；local 标签与 compose.yaml 的三个应用服务一致。
+      - name: Build immutable application image
+        run: docker build --pull --tag serviceops-agent:local .
+
+      # 在启动前静态确认镜像配置的默认用户确实是固定非 root UID/GID。
+      - name: Verify image runtime user
+        shell: bash
+        run: |
+          test "$(docker image inspect --format '{{.Config.User}}' serviceops-agent:local)" = "10001:10001"
+
+      # 使用刚构建的本地镜像启动迁移、双 Agent、Nginx 和临时 PostgreSQL，不调用任何真实模型。
+      - name: Start hardened multi-instance topology
+        run: docker compose up --detach --no-build --wait --wait-timeout 120
+
+      # 一次性迁移必须正常完成；两个长期 Agent 继续满足非 root、只读与零 Capability。
+      - name: Verify migration and runtime hardening
+        shell: bash
+        run: |
+          test "$(docker compose ps -a --status exited --services migrate)" = "migrate"
+          docker compose logs migrate | grep -F "PASS: ServiceOps"
+          agent_a_id="$(docker compose ps -q agent-a)"
+          test -n "$agent_a_id"
+          test "$(docker inspect --format '{{.Config.User}}' "$agent_a_id")" = "10001:10001"
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$agent_a_id")" = "true"
+          test "$(docker inspect --format '{{json .HostConfig.CapDrop}}' "$agent_a_id")" = '["ALL"]'
+
+      # 连续请求必须经过 Nginx 并真实观察到两个实例；readiness 仍需四项依赖全部可读。
+      - name: Verify gateway round robin and readiness
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          seen = set()
+          for _ in range(12):
+              with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as response:
+                  payload = json.loads(response.read().decode("utf-8"))
+                  assert response.headers["X-ServiceOps-Gateway"] == "nginx"
+                  assert response.headers["X-ServiceOps-Instance"] == payload["instance_id"]
+                  seen.add(payload["instance_id"])
+              if seen == {"agent-a", "agent-b"}:
+                  break
+          assert seen == {"agent-a", "agent-b"}
+
+          with urllib.request.urlopen("http://127.0.0.1:8000/ready", timeout=5) as response:
+              payload = json.loads(response.read().decode("utf-8"))
+          assert payload["status"] == "ready"
+          assert payload["persistence_backend"] == "postgres"
+          assert len(payload["checks"]) == 4
+          assert all(item["status"] == "ready" for item in payload["checks"].values())
+          PY
+
+      # 控制台必须随 wheel 进入镜像，并通过 Nginx 返回同源 HTML/CSS/JavaScript 与浏览器安全策略。
+      - name: Verify packaged Agent console
+        shell: bash
+        run: |
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://127.0.0.1:8000/)" = "307"
+          curl --fail --silent --dump-header /tmp/console-headers.txt \
+            --output /tmp/console.html \
+            http://127.0.0.1:8000/console/
+          grep --fixed-strings "看见 Agent 如何做决定" /tmp/console.html
+          grep --fixed-strings 'id="customer-token-input" type="password"' /tmp/console.html
+          grep --fixed-strings 'id="developer-token-input" type="password"' /tmp/console.html
+          grep --fixed-strings "CHECKPOINT PLAYBACK" /tmp/console.html
+          grep --fixed-strings "Agent 执行回放工作台" /tmp/console.html
+          grep --fixed-strings 'id="debug-focus-button"' /tmp/console.html
+          grep --ignore-case --fixed-strings "content-security-policy:" /tmp/console-headers.txt
+          grep --fixed-strings "frame-ancestors 'none'" /tmp/console-headers.txt
+          curl --fail --silent --output /tmp/console.css \
+            http://127.0.0.1:8000/console/assets/console.css
+          curl --fail --silent --output /tmp/console.js \
+            http://127.0.0.1:8000/console/assets/console.js
+          grep --fixed-strings ".content-grid" /tmp/console.css
+          grep --fixed-strings ".debug-inspector" /tmp/console.css
+          grep --fixed-strings "body.debug-focus-mode" /tmp/console.css
+          grep --fixed-strings ".debug-stage" /tmp/console.css
+          grep --fixed-strings 'requestJson("/api/v1/chat"' /tmp/console.js
+          grep --fixed-strings '/api/v1/debug/threads/' /tmp/console.js
+          grep --fixed-strings 'setDebugFocusMode' /tmp/console.js
+
+      # 业务接口不带 Token 必须返回 401，证明容器配置没有绕过应用认证。
+      - name: Verify unauthenticated requests are rejected
+        shell: bash
+        run: |
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --data '{"message":"查询订单 SO100001"}' \
+            http://127.0.0.1:8000/api/v1/chat)"
+          test "$status" = "401"
+
+      # 瞬时并发必须触发明确 429，且三秒后认证边界应恢复为 401，不能留下 5xx 或永久限流。
+      - name: Verify gateway burst protection and recovery
+        shell: bash
+        run: |
+          rm -f /tmp/burst-statuses.txt
+          seq 1 30 | xargs -P 30 -I {} sh -c '
+            curl --silent --output /dev/null --write-out "%{http_code}\n" \
+              --header "Content-Type: application/json" \
+              --data "{\"message\":\"查询订单 SO100001\"}" \
+              http://127.0.0.1:8000/api/v1/chat >> /tmp/burst-statuses.txt
+          '
+          grep --fixed-strings --line-regexp "429" /tmp/burst-statuses.txt
+          if grep --extended-regexp --line-regexp "5[0-9][0-9]" /tmp/burst-statuses.txt; then
+            exit 1
+          fi
+          sleep 3
+          recovered_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --data '{"message":"查询订单 SO100001"}' \
+            http://127.0.0.1:8000/api/v1/chat)"
+          test "$recovered_status" = "401"
+
+      # 使用同一临时 PostgreSQL 真正执行 pg_dump、隔离 pg_restore、逐表比较和临时库清理。
+      - name: Verify PostgreSQL backup and isolated restore drill
+        shell: bash
+        run: |
+          PYTHONPATH=src python examples/19_postgres_backup_restore_drill.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path("data/runtime/postgres_step19_report.json").read_text(encoding="utf-8")
+          )
+          assert report["status"] == "pass"
+          assert report["verified_table_count"] >= 8
+          assert report["fingerprint_match"] is True
+          assert report["temporary_database_removed"] is True
+          assert Path(report["backup_path"]).is_file()
+          assert Path(report["manifest_path"]).is_file()
+          PY
+
+      # 失败时输出五个角色日志；Runner 上的数据库卷只含本次临时数据，可以在 finally 中删除。
+      - name: Show logs and remove test resources
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          docker compose ps -a 2>&1 || true
+          docker compose logs --tail 200 gateway agent-a agent-b migrate postgres 2>&1 || true
+          docker compose down --volumes --remove-orphans 2>/dev/null || true

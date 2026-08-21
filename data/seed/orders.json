@@ -1,0 +1,26 @@
+[
+  {
+    "order_id": "SO100001",
+    "user_id": "user-001",
+    "status": "shipped",
+    "carrier": "顺丰速运",
+    "tracking_number": "SF1234567890",
+    "updated_at": "2026-08-18T15:30:00+08:00"
+  },
+  {
+    "order_id": "SO100002",
+    "user_id": "user-001",
+    "status": "delivered",
+    "carrier": "中通快递",
+    "tracking_number": "ZT9876543210",
+    "updated_at": "2026-08-17T11:20:00+08:00"
+  },
+  {
+    "order_id": "SO200001",
+    "user_id": "user-002",
+    "status": "paid",
+    "carrier": null,
+    "tracking_number": null,
+    "updated_at": "2026-08-19T09:10:00+08:00"
+  }
+]

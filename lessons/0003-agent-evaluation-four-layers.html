@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第三课：用四层评测看懂 Agent 是否真的可靠</title>
+  <style>
+    :root { --ink:#17232a; --muted:#66757c; --accent:#176b68; --wash:#edf8f6; --line:#d3e6e2; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; background:#f4f7f6; color:var(--ink); line-height:1.75; }
+    main { max-width:820px; margin:42px auto; padding:48px; background:white; box-shadow:0 12px 40px #173b3514; }
+    h1 { margin-top:0; line-height:1.2; } h2 { color:var(--accent); margin-top:2rem; }
+    .goal,.practice { background:var(--wash); padding:18px 22px; border-radius:10px; }
+    code { background:#e7f2f0; padding:.12rem .35rem; border-radius:4px; }
+    pre { overflow:auto; background:#152b2a; color:#effaf8; padding:18px; border-radius:8px; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:11px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    details { margin:12px 0; padding:12px 16px; border:1px solid var(--line); border-radius:8px; background:white; }
+    a { color:var(--accent); } .muted { color:var(--muted); }
+    @media print { body { background:white; } main { margin:0; box-shadow:none; } }
+  </style>
+</head>
+<body><main>
+  <p class="muted">ServiceOps Agent · 约10分钟</p>
+  <h1>用四层评测看懂 Agent 是否真的可靠</h1>
+  <div class="goal"><strong>本课唯一目标：</strong>面对一个 Agent 失败案例，能判断它属于路由、轨迹、响应契约还是安全不变量。</div>
+
+  <h2>先运行整图实验</h2>
+  <pre><code>cd D:\serviceops-agent
+uv run python examples/13_agent_end_to_end_evaluation.py</code></pre>
+  <p>你会看到 13 条样本真实经过 LangGraph，而不是把保存好的答案拿来打分。打开
+  <code>data/runtime/agent_end_to_end_report.json</code>，找到每条样本的四个 <code>*_passed</code> 字段。</p>
+
+  <h2>四层地图</h2>
+  <table>
+    <thead><tr><th>层</th><th>核心问题</th><th>本项目证据</th></tr></thead>
+    <tbody>
+      <tr><td>路由</td><td>走对业务分支了吗？</td><td><code>intent</code></td></tr>
+      <tr><td>工具轨迹</td><td>真的按顺序执行正确工具了吗？</td><td><code>ToolExecutionRecord</code></td></tr>
+      <tr><td>响应契约</td><td>完成、中断、人工、澄清、引用正确吗？</td><td>State有限字段</td></tr>
+      <tr><td>安全不变量</td><td>有没有越权泄漏或隐藏副作用？</td><td>禁止词、引用、仓库计数</td></tr>
+    </tbody>
+  </table>
+
+  <h2>为什么答案正确仍可能失败</h2>
+  <p>如果 Agent 没有调用订单工具，却碰巧回答“订单不存在”，最终文字也许像是正确的；但工具轨迹必须
+  失败。可靠性来自可验证的行动和外部效果，不来自一次碰巧好看的文本。</p>
+
+  <h2>闭卷归类</h2>
+  <div class="practice">
+    <details><summary>问题一：发票问题被分到订单查询，属于哪层？</summary><p>路由层。实际 intent 与人工参考 intent 不一致。</p></details>
+    <details><summary>问题二：查询两个订单时只调用一次工具，属于哪层？</summary><p>工具轨迹层。工具顺序、目标订单或调用预算不符合参考轨迹。</p></details>
+    <details><summary>问题三：退货草案完整却没有 interrupt，属于哪层？</summary><p>响应契约层。预期 approval_required，实际却错误完成或转入其他状态。</p></details>
+    <details><summary>问题四：审批前仓库记录数从零变一，属于哪层？</summary><p>安全不变量层。即使页面显示等待审批，真实业务副作用已经违规发生。</p></details>
+  </div>
+
+  <h2>你的复述任务</h2>
+  <p>不要看上面的表，用自己的话回答我：</p>
+  <p><strong>为什么“最终答案看起来正确”仍不足以证明 Agent 可靠？本项目又用哪四层证据补足？</strong></p>
+
+  <p>主资料：<a href="https://docs.langchain.com/langsmith/evaluation-concepts">LangSmith Evaluation Concepts</a>、
+  <a href="https://docs.langchain.com/oss/python/langgraph/test">LangGraph Test</a>；
+  复习可打开<a href="../reference/agent-evaluation-checklist.html">Agent评测速查</a>。</p>
+  <p class="muted">完成复述后发给我，我会逐点反馈；任何代码或概念不清楚也可以直接继续问。</p>
+</main></body>
+</html>

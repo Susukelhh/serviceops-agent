@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RAG证据充分性面试卡</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#18232d;--muted:#64727c;--blue:#275bc4;--green:#16734b;--line:#dce4ea}
+    *{box-sizing:border-box}body{margin:0;background:#eef3f7;color:var(--ink)}
+    main{width:min(1040px,calc(100% - 28px));margin:26px auto;padding:36px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 50px rgba(30,50,70,.08)}
+    h1{margin:0 0 8px;font-family:Georgia,"Songti SC",serif;font-size:38px}.lead,footer{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:26px 0}.card{padding:18px;border:1px solid var(--line);border-radius:14px}.card b{color:var(--blue)}
+    table{width:100%;border-collapse:collapse;margin:18px 0}th,td{padding:11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f4f7fa}
+    .result{padding:18px;background:#edf9f3;border:1px solid #bde2cf;border-radius:12px}.result strong{color:var(--green)}
+    .answer{padding:18px;border-left:4px solid var(--blue);background:#eef3ff;border-radius:10px}code{background:#eef1f4;padding:2px 5px;border-radius:5px}a{color:var(--blue)}
+    footer{margin-top:26px;font-size:12px}@media(max-width:760px){.grid{grid-template-columns:1fr}}@media print{body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>RAG证据充分性面试卡</h1>
+  <p class="lead">看到检索命中时，按三层判断，不把“有引用”误当成“有答案”。</p>
+  <div class="grid">
+    <section class="card"><b>1. 相关性</b><p>问题和文档主题是否接近？由Embedding、BM25、Rerank和Top-K主要负责。</p></section>
+    <section class="card"><b>2. 充分性</b><p>候选正文是否包含回答问题所需事实？由<code>is_answerable</code>判断。</p></section>
+    <section class="card"><b>3. 合法性</b><p>答案引用是否来自本轮候选白名单？由确定性代码检查，不交给模型自证。</p></section>
+  </div>
+  <table>
+    <thead><tr><th>面试追问</th><th>项目回答</th></tr></thead>
+    <tbody>
+      <tr><td>有Citation为何还会幻觉？</td><td>引用ID真实只证明来源存在；文档可能与问题相似但不蕴含答案。</td></tr>
+      <tr><td>为什么不只提高阈值？</td><td>第27步开发集0.50 Recall 91.7%，0.60降到83.3%；阈值会同时伤害正确召回。</td></tr>
+      <tr><td>为什么Rerank不够？</td><td>它只能给已有候选排序，知识缺口时第一名仍可能是最相似的错误文档。</td></tr>
+      <tr><td>如何防全拒答刷安全分？</td><td>同时设置Answerable Recall与Abstention Accuracy质量门。</td></tr>
+      <tr><td>模型判断失灵怎么办？</td><td>结构化解析失败、无引用、越界引用全部fail-safe转人工。</td></tr>
+    </tbody>
+  </table>
+  <section class="result">
+    <strong>专项与端到端锁定结果：PASS</strong>
+    <p>10条固定证据专项题中，Grounded候选把无依据回答率从100%降到0%；随后在12条全链路新锁定题中，把当前链路无依据回答率从50%降到0%，并保持正例Recall、Top-1、有答案召回和引用合法率100%。</p>
+  </section>
+  <div class="answer">
+    <strong>30秒项目表达</strong>
+    <p>语义Embedding在8条锁定正例上Top-1全对，但支付方式问题误召回数字商品规则。我没有继续调已揭晓数据，而是固定真实Chunk做单变量充分性实验。旧回答器在锁定集无依据回答率100%；加入Pydantic结构化<code>is_answerable</code>、引用白名单和人工接管后降到0%，同时保持知识内回答召回100%。</p>
+  </div>
+  <p><a href="../lessons/0020-similar-evidence-is-not-sufficient-evidence.html">复习第20课</a> · <a href="../docs/steps/28-grounding-sufficiency-and-hallucination-control.md">查看实验记录</a></p>
+  <footer>诚实边界：端到端100%只代表12条小型锁定题；开发集仍有上门取件Bad Case，也未覆盖真实线上分布和知识更新，不能表述为线上幻觉率为0。</footer>
+</main>
+</body>
+</html>

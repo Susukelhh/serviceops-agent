@@ -1,0 +1,68 @@
+[
+  {
+    "case_id": "invoice-tax-id-correction",
+    "question": "发票税号写错了怎么办",
+    "expected_document_ids": ["KB-INVOICE-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "invoice-issuance-time",
+    "question": "电子发票多久开出来",
+    "expected_document_ids": ["KB-INVOICE-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "refund-within-seven-days",
+    "question": "商品签收五天可以无理由退货吗",
+    "expected_document_ids": ["KB-REFUND-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "refund-customized-product",
+    "question": "定制商品支持七天无理由退货吗",
+    "expected_document_ids": ["KB-REFUND-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "warranty-human-damage",
+    "question": "人为损坏还能免费保修吗",
+    "expected_document_ids": ["KB-WARRANTY-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "warranty-period",
+    "question": "电子产品保修多久",
+    "expected_document_ids": ["KB-WARRANTY-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "support-closing-time",
+    "question": "人工客服几点下班",
+    "expected_document_ids": ["KB-SUPPORT-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "support-off-hours-queue",
+    "question": "非工作时间提交问题怎么处理",
+    "expected_document_ids": ["KB-SUPPORT-001"],
+    "should_retrieve": true
+  },
+  {
+    "case_id": "negative-weather",
+    "question": "今天天气如何",
+    "expected_document_ids": [],
+    "should_retrieve": false
+  },
+  {
+    "case_id": "negative-poem",
+    "question": "帮我写一首诗",
+    "expected_document_ids": [],
+    "should_retrieve": false
+  },
+  {
+    "case_id": "negative-internal-policy",
+    "question": "公司内部高价值客户怎么补偿",
+    "expected_document_ids": [],
+    "should_retrieve": false
+  }
+]

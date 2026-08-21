@@ -1,0 +1,30 @@
+{
+  "experiment_id": "serviceops-rag-semantic-embedding-candidate",
+  "version": "1.0.0",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_path": "data/experiments/rag_v2/semantic_development_cases.json",
+  "holdout_dataset_path": "data/experiments/rag_v2/semantic_holdout_cases.json",
+  "holdout_case_count": 10,
+  "embedding_model": "qwen3.7-text-embedding",
+  "embedding_dimensions": 1024,
+  "embedding_batch_size": 20,
+  "input_price_cny_per_million_tokens": 0.5,
+  "chunk_size": 500,
+  "chunk_overlap": 80,
+  "candidate_k": 5,
+  "top_k": 5,
+  "threshold_candidates": [0.10, 0.20, 0.30, 0.40, 0.50, 0.60],
+  "frozen_candidate_threshold": 0.50,
+  "development_gate": {
+    "min_recall_at_k": 0.90,
+    "min_top_1_accuracy": 0.80,
+    "min_decision_accuracy": 0.85,
+    "max_false_positive_rate": 0.25
+  },
+  "holdout_gate": {
+    "min_recall_at_k": 0.85,
+    "min_top_1_accuracy": 0.75,
+    "min_decision_accuracy": 0.80,
+    "max_false_positive_rate": 0.25
+  }
+}

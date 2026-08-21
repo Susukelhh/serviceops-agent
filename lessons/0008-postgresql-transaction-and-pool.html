@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第八课：连接池、事务与 PostgreSQL 重建验证</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#60697a; --blue:#2859d8; --green:#117861; --orange:#bd5b19; --paper:#fff; --line:#dfe4eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#edf5ff,#fff9ef 52%,#ebfaf3); color:var(--ink); font:17px/1.73 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(980px,calc(100% - 30px)); margin:32px auto; padding:clamp(23px,5vw,56px); background:rgba(255,255,255,.97); border:1px solid var(--line); border-radius:22px; box-shadow:0 20px 65px rgba(31,52,91,.12); }
+    h1 { margin:.15em 0 .35em; font:800 clamp(34px,6vw,55px)/1.12 Georgia,"Songti SC",serif; letter-spacing:-.035em; }
+    h2 { margin:2em 0 .55em; font-size:1.42rem; }
+    h3 { color:var(--blue); }
+    .eyebrow { color:var(--blue); font-weight:780; letter-spacing:.08em; }
+    .lead { color:var(--muted); font-size:1.12rem; }
+    .answer { background:#edf9f4; border-left:5px solid var(--green); border-radius:10px; padding:16px 20px; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; margin:20px 0; }
+    .card { padding:19px; border:1px solid var(--line); border-radius:16px; background:#fffdfa; }
+    .card h3 { margin:0 0 8px; }
+    code { background:#eef2f7; border-radius:6px; padding:.12em .4em; }
+    pre { overflow:auto; background:#111827; color:#f1f5ff; border-radius:14px; padding:18px; line-height:1.6; }
+    .warn { background:#fff4e8; border-left:5px solid var(--orange); border-radius:10px; padding:16px 20px; }
+    .interview { background:#f0f5ff; border:1px solid #ccd9fb; border-radius:14px; padding:18px; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:11px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    nav { display:flex; flex-wrap:wrap; gap:16px; margin-top:32px; padding-top:18px; border-top:1px solid var(--line); }
+    a { color:var(--blue); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:760px) { .grid { grid-template-columns:1fr; } main { margin:14px auto; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 第 16 步配套课</div>
+  <h1>把数据库理解成银行：窗口、盖章和总账本</h1>
+  <p class="lead">你不需要先背 SQL。这一课只讲清楚本项目为什么需要连接池、事务，以及我们怎样证明容器重建后没有“失忆”。</p>
+
+  <div class="answer"><strong>先记住结论：</strong>PostgreSQL是独立总账本；连接池是提前开好的有限窗口；事务是“一整套操作一起盖章生效”；LangGraph Checkpointer保存工作进度，业务表保存真实退货事实。</div>
+
+  <h2>现在数据库仍是独立总账本</h2>
+  <pre><code>Windows 浏览器
+      │ 127.0.0.1:8000
+      ▼
+Nginx 网关 ──► agent-a / agent-b ──► postgres 容器
+                 业务规则和 LangGraph      共享数据和进度
+
+PostgreSQL 数据 ──► Docker 具名卷（重建容器也保留）</code></pre>
+  <p>API容器没有自己的数据库文件，所以它可以被销毁、替换或增加副本。PostgreSQL的5432端口没有映射到Windows，普通局域网用户也不能绕过API直接访问数据库。</p>
+
+  <h2>三个容易混淆的词</h2>
+  <div class="grid">
+    <section class="card"><h3>连接池</h3><p>像银行提前开放1到5个窗口。请求来时借窗口，办完归还；不用每位客户都重新装修一个窗口。</p></section>
+    <section class="card"><h3>事务</h3><p>像一叠材料必须一起盖章。退货记录和Outbox事件要么一起成功，要么一起撤销，不能只完成一半。</p></section>
+    <section class="card"><h3>锁</h3><p>像正在填写的同一张表暂时挂上“办理中”。其他员工可以办别的业务，但不能同时改坏这一张表。</p></section>
+  </div>
+
+  <h2>为什么分成两类表</h2>
+  <table>
+    <thead><tr><th>保存什么</th><th>白话解释</th><th>本项目实现</th></tr></thead>
+    <tbody>
+      <tr><td>Checkpoint</td><td>Agent做到哪一步、是否等待审批</td><td>官方 <code>AsyncPostgresSaver</code> 管理4张表</td></tr>
+      <tr><td>业务数据</td><td>真实退货申请、待投递事件、审批证据</td><td>项目仓储管理3张表</td></tr>
+    </tbody>
+  </table>
+  <p>Checkpoint不是订单系统本身。就像“快递员走到哪一站”的进度不能代替“客户已经退款”的财务事实，两者职责和生命周期不同。</p>
+
+  <h2>这次真实遇到了什么故障</h2>
+  <p>第一次批准退货时，业务记录与Outbox已经成功提交；随后协调器按可选<code>thread_id</code>扫描事件，PostgreSQL要求给空参数说明明确文本类型，而原SQL没有说明，于是返回错误。</p>
+  <div class="warn"><strong>关键价值：</strong>错误没有让事件消失。Outbox仍保持<code>pending</code>，修复参数类型后，运维补偿接口扫描1条、成功处理1条、失败0条。这就是“允许暂时失败，但不能静默丢业务事实”。</div>
+
+  <h2>我们怎样证明不是假持久化</h2>
+  <ol>
+    <li>通过真实HTTP发起退货，图先暂停等待审批。</li>
+    <li>用独立审批身份批准，生成退货记录、Outbox和两条审计事件。</li>
+    <li>强制销毁并重新创建API容器，PostgreSQL容器和数据卷保持不动。</li>
+    <li>新API再次审批旧线程得到409，证明它从数据库读到“已经完成”。</li>
+    <li>新API读取原审计链，哈希校验有效且退货申请编号一致。</li>
+  </ol>
+  <pre><code>uv run python examples/16_postgres_docker_persistence.py --mode write
+docker compose up -d --force-recreate --wait agent-a agent-b gateway
+uv run python examples/16_postgres_docker_persistence.py --mode verify</code></pre>
+
+  <h2>面试官可能追问</h2>
+  <div class="interview"><strong>可直接回答：</strong>“我保留SQLite作为低门槛本地模式，Compose默认迁移到PostgreSQL。LangGraph使用官方Postgres Checkpointer，业务侧用psycopg连接池。退货与Outbox同事务；幂等键、唯一约束和按键建议锁防止多实例重复写；审计链按thread_id串行追加。我还做了API容器强制重建验证，并把真实PostgreSQL测试放进CI。”</div>
+  <p>若继续追问“是否已经生产可用”，要诚实回答：第十七步已经补上Alembic迁移、双Agent与Nginx入口，但本机Compose仍不是完整云生产平台；还缺平台密钥、TLS、备份恢复、数据库高可用和正式容量压测。</p>
+
+  <p><small>对应代码：<code>infrastructure/runtime.py</code>负责生命周期装配，<code>infrastructure/postgres_repository.py</code>负责业务事务，<code>compose.yaml</code>负责启动API与数据库。</small></p>
+  <nav>
+    <a href="0007-sqlite-vs-postgresql-in-plain-chinese.html">← 上一课：SQLite 与 PostgreSQL</a>
+    <a href="0009-multi-instance-in-plain-chinese.html">下一课：双实例与负载均衡 →</a>
+  </nav>
+</main>
+</body>
+</html>

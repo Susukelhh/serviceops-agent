@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第二课：结构化分类与安全工具边界</title>
+  <style>
+    :root { --ink:#192329; --muted:#68747a; --accent:#8a3d1f; --wash:#fbf1eb; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; background:#f6f5f3; color:var(--ink); line-height:1.75; }
+    main { max-width:780px; margin:42px auto; padding:48px; background:white; box-shadow:0 12px 40px #2e1f1514; }
+    h1 { margin-top:0; line-height:1.2; } h2 { color:var(--accent); margin-top:2rem; }
+    .goal,.practice { background:var(--wash); padding:18px 22px; border-radius:10px; }
+    code { background:#f3e9e3; padding:.12rem .35rem; border-radius:4px; }
+    pre { overflow:auto; background:#241d19; color:#f8eee8; padding:18px; border-radius:8px; }
+    details { margin:12px 0; padding:12px 16px; border:1px solid #e5d8d0; border-radius:8px; }
+    a { color:var(--accent); } .muted { color:var(--muted); }
+    @media print { body { background:white; } main { margin:0; box-shadow:none; } }
+  </style>
+</head>
+<body><main>
+  <p class="muted">ServiceOps Agent · 约10分钟</p>
+  <h1>结构化分类与安全工具边界</h1>
+  <div class="goal"><strong>本课唯一目标：</strong>解释为什么模型能提供订单号，却不能提供当前用户身份。</div>
+
+  <h2>先运行工具</h2>
+  <pre><code>cd D:\serviceops-agent
+uv run python examples/02_order_tool.py</code></pre>
+  <p>第一段输出是模型可见的工具Schema。它应该只有<code>order_id</code>，没有
+  <code>user_id</code>。身份由系统创建工具时通过闭包注入。</p>
+
+  <h2>再理解两种结构化</h2>
+  <p><strong>模型结构化输出：</strong>Pydantic约束模型只能给出意图、置信度和简短原因。</p>
+  <p><strong>工具结构化输入/输出：</strong>Pydantic校验订单号格式，OrderLookupResult校验查询事实。</p>
+  <p>两者解决不同问题：前者约束模型决策，后者保护业务系统边界。</p>
+
+  <h2>闭卷回忆</h2>
+  <div class="practice">
+    <details><summary>为什么不让模型填写user_id？</summary><p>因为用户文本和模型输出都不可信；身份必须来自认证系统，否则模型可伪造身份越权查询。</p></details>
+    <details><summary>为什么低置信度FAQ仍可能转人工？</summary><p>模型输出只是候选决策，系统阈值是独立安全门，低把握结果不能进入自动路径。</p></details>
+    <details><summary>为什么工具结果还要再次校验？</summary><p>工具也可能出错或被替换；结构化校验防止异常字段继续污染状态和用户回答。</p></details>
+  </div>
+
+  <h2>你的复述任务</h2>
+  <p>请用自己的话告诉我：<code>order_id</code>和<code>user_id</code>分别由谁控制，订单归属在哪一层检查？</p>
+  <p>主资料：<a href="https://docs.langchain.com/oss/python/langchain/models">LangChain Models</a>、
+  <a href="https://docs.langchain.com/oss/python/langchain/tools">LangChain Tools</a>；
+  复习可打开<a href="../reference/tool-security-boundaries.html">工具安全边界速查</a>。</p>
+  <p class="muted">任何代码或概念不清楚，都可以直接继续问我。</p>
+</main></body>
+</html>

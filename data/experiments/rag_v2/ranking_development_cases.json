@@ -1,0 +1,22 @@
+[
+  {"case_id":"rank-dev-return-unpacked","question":"只拆开包装试了试，配件赠品都完整，普通商品还能退吗？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["return-pair","lexical-ranking"],"difficulty":"hard"},
+  {"case_id":"rank-dev-return-missing-accessory","question":"想无理由退货，但少了一个随机配件会怎样？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["return-pair","multi-section"],"difficulty":"hard"},
+  {"case_id":"rank-dev-custom-regret","question":"刻字耳机内容没错，只是我反悔不想要了能退吗？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["return-pair","customized"],"difficulty":"hard"},
+  {"case_id":"rank-dev-custom-defect","question":"照片定制纪念品做出来和确认稿不一样，该走什么售后？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["return-pair","quality-exception"],"difficulty":"hard"},
+  {"case_id":"rank-dev-freight-personal","question":"东西没有质量问题，是我个人不想要，寄回费用归谁？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_retrieve":true,"tags":["return-pair","responsibility"],"difficulty":"hard"},
+  {"case_id":"rank-dev-freight-wrong-item","question":"收到的型号和订单不一样，换货来回快递费谁承担？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_retrieve":true,"tags":["return-pair","responsibility"],"difficulty":"hard"},
+  {"case_id":"rank-dev-warranty-proof","question":"电子产品坏了申请维修，需要订单号还是其他购买证明？","expected_document_ids":["KB-WARRANTY-GENERAL-001"],"should_retrieve":true,"tags":["warranty-pair","proof"],"difficulty":"hard"},
+  {"case_id":"rank-dev-warranty-unauthorized","question":"在街边维修店拆过机器，后来故障还能享受标准免费保修吗？","expected_document_ids":["KB-WARRANTY-GENERAL-001"],"should_retrieve":true,"tags":["warranty-pair","boundary"],"difficulty":"hard"},
+  {"case_id":"rank-dev-liquid-emergency","question":"饮料泼进笔记本以后，我应该继续开机还是先停止充电？","expected_document_ids":["KB-WARRANTY-LIQUID-001"],"should_retrieve":true,"tags":["warranty-pair","procedure"],"difficulty":"hard"},
+  {"case_id":"rank-dev-liquid-plan","question":"手机进水通常不免费修，那我买的意外保障可能报吗？","expected_document_ids":["KB-WARRANTY-LIQUID-001"],"should_retrieve":true,"tags":["warranty-pair","coverage"],"difficulty":"hard"},
+  {"case_id":"rank-dev-invoice-pending","question":"电子票还没有生成票号，现在企业名称写错能撤回修改吗？","expected_document_ids":["KB-INVOICE-GENERAL-001"],"should_retrieve":true,"tags":["invoice-pair","state-dependent"],"difficulty":"hard"},
+  {"case_id":"rank-dev-invoice-download","question":"普通电子发票申请后大约多久开出，从订单哪里下载？","expected_document_ids":["KB-INVOICE-GENERAL-001"],"should_retrieve":true,"tags":["invoice-pair","multi-section"],"difficulty":"hard"},
+  {"case_id":"rank-dev-invoice-issued-wrong","question":"票号已经生成，但是纳税人识别号错了，为什么不能直接编辑？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["invoice-pair","state-dependent"],"difficulty":"hard"},
+  {"case_id":"rank-dev-invoice-partial-return","question":"订单已经开票，后来退掉其中一件商品，原票怎么红字处理？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["invoice-pair","cross-process"],"difficulty":"hard"},
+  {"case_id":"rank-dev-logistics-stalled","question":"运输记录好几天停在同一个扫描点，怎么向承运商催查？","expected_document_ids":["KB-LOGISTICS-DELAY-001"],"should_retrieve":true,"tags":["logistics-pair","delay"],"difficulty":"hard"},
+  {"case_id":"rank-dev-logistics-address","question":"包裹已经离开仓库，还能申请拦截然后换收货地点吗？","expected_document_ids":["KB-LOGISTICS-DELAY-001"],"should_retrieve":true,"tags":["logistics-pair","address"],"difficulty":"hard"},
+  {"case_id":"rank-dev-logistics-signed","question":"轨迹显示本人已签收，可是我和家人都没拿到，需要查什么？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["logistics-pair","signed-missing"],"difficulty":"hard"},
+  {"case_id":"rank-dev-logistics-proof","question":"快递说已投递，平台会调取照片、定位还是签收凭证？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["logistics-pair","evidence"],"difficulty":"hard"},
+  {"case_id":"rank-dev-price-coupon","question":"同一商品只是优惠券不一样，能按照券后价格补差吗？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_retrieve":true,"tags":["pricing","boundary"],"difficulty":"hard"},
+  {"case_id":"rank-dev-support-night","question":"晚上二十二点提交客服问题，会马上有人工接待还是进入队列？","expected_document_ids":["KB-SUPPORT-SECURITY-001"],"should_retrieve":true,"tags":["support","time"],"difficulty":"hard"}
+]

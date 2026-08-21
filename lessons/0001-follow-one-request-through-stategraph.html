@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第一课：跟踪一条请求穿过 StateGraph</title>
+  <style>
+    :root { --ink:#17212b; --muted:#667582; --accent:#0c6b5d; --paper:#fff; --wash:#edf6f3; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; background:#f4f6f5; color:var(--ink); line-height:1.75; }
+    main { max-width:760px; margin:42px auto; padding:48px; background:var(--paper); box-shadow:0 12px 40px #183a3014; }
+    h1 { line-height:1.2; margin-top:0; font-size:2.1rem; } h2 { margin-top:2rem; color:var(--accent); }
+    .goal,.practice { padding:18px 22px; background:var(--wash); border-radius:10px; }
+    code { background:#edf2f1; padding:.12rem .35rem; border-radius:4px; }
+    pre { overflow:auto; background:#13211e; color:#e6f4ef; padding:18px; border-radius:8px; }
+    details { margin:12px 0; padding:12px 16px; border:1px solid #dbe4e1; border-radius:8px; }
+    a { color:var(--accent); } .muted { color:var(--muted); }
+    @media print { body { background:white; } main { margin:0; max-width:none; box-shadow:none; } }
+  </style>
+</head>
+<body><main>
+  <p class="muted">ServiceOps Agent · 约 8 分钟</p>
+  <h1>跟踪一条请求穿过 StateGraph</h1>
+  <div class="goal"><strong>本课唯一目标：</strong>你能口述一条订单请求如何经过 State、Node 和 Conditional Edge。</div>
+
+  <h2>先运行</h2>
+  <pre><code>cd D:\serviceops-agent
+uv run python examples/01_minimal_stategraph.py
+uv run pytest tests/integration/test_graph.py -q</code></pre>
+
+  <h2>再跟踪真实工单</h2>
+  <p>输入“我的订单到哪了”后，共享状态先由 <code>normalize_request</code> 增加
+  <code>normalized_message</code>，随后 <code>classify_intent</code> 增加
+  <code>intent=order_status</code>。条件边读取该意图并选择 <code>answer_order</code>。</p>
+  <p>三个节点每次都返回一个新的 <code>events</code> 列表，但最终列表仍包含全部事件，
+  因为该字段声明了 <code>operator.add</code> Reducer。</p>
+
+  <h2>闭卷回忆</h2>
+  <div class="practice">
+    <p>不要先展开答案，尝试用自己的话回答：</p>
+    <details><summary>问题一：State 和 Node 分别负责什么？</summary><p>State 携带任务数据；Node 读取状态并返回本步骤产生的更新。</p></details>
+    <details><summary>问题二：为什么 events 不会被覆盖？</summary><p>它通过 Annotated 绑定了 operator.add Reducer，多次更新会执行列表相加。</p></details>
+    <details><summary>问题三：未知问题为什么转人工？</summary><p>证据不足时选择安全退出，避免自动系统猜测并产生错误业务动作。</p></details>
+  </div>
+
+  <h2>下一次对话前的小任务</h2>
+  <p>请不看代码告诉我：“一条订单请求经过了哪些节点，路由函数读取了哪个字段？”
+  我会根据你的回答决定下一步讲结构化输出还是先补 Reducer。</p>
+
+  <p>主资料：<a href="https://docs.langchain.com/oss/python/langgraph/graph-api">LangGraph Graph API 官方文档</a>；
+  复习时可打开 <a href="../reference/langgraph-core-concepts.html">核心概念速查</a>。</p>
+  <p class="muted">任何代码或概念不清楚，都可以直接继续问我。</p>
+</main></body>
+</html>

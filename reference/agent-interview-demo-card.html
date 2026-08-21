@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceOps Agent 面试演示速查卡</title>
+  <style>
+    :root { font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif; --ink:#15231d; --green:#176c50; --line:#d8e2dc; --soft:#edf6f1; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:#eef3f0; line-height:1.55; }
+    main { width:min(1060px,calc(100% - 28px)); margin:22px auto; padding:30px; border:1px solid var(--line); border-radius:20px; background:#fff; }
+    header { display:flex; justify-content:space-between; gap:20px; padding-bottom:18px; border-bottom:2px solid var(--ink); }
+    h1 { margin:0; font-size:28px; } header p { max-width:520px; margin:0; color:#607068; font-size:13px; }
+    h2 { margin:0 0 9px; color:var(--green); font-size:12px; letter-spacing:.1em; text-transform:uppercase; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:16px; }
+    section { padding:16px; border:1px solid var(--line); border-radius:14px; }
+    ol,ul { margin:0; padding-left:20px; } li+li { margin-top:6px; }
+    .flow { grid-column:1/-1; background:var(--soft); }
+    .flow p { margin:0; font:700 13px/1.8 ui-monospace,"Cascadia Code",monospace; }
+    .warning { border-color:#e8c68f; background:#fff7e8; }
+    code { color:#0e5b41; }
+    footer { margin-top:16px; color:#67746e; font-size:11px; text-align:right; }
+    @media(max-width:700px){ header{flex-direction:column}.grid{grid-template-columns:1fr}.flow{grid-column:auto} }
+    @media print { @page { size:A4 landscape; margin:10mm; } body{background:#fff} main{width:100%;margin:0;padding:15px;border:0} }
+  </style>
+</head>
+<body>
+<main>
+  <header><div><h1>ServiceOps Agent 演示速查卡</h1><strong>五分钟 · 四场景 · 一条主线</strong></div><p>主线：模型负责有限决策，工具负责确定性行动，LangGraph 负责流程和恢复，PostgreSQL 负责共享状态，人工负责高风险写入。</p></header>
+  <div class="grid">
+    <section class="flow"><h2>开场公式</h2><p>业务问题 → Agent 决策 → 确定性执行 → 安全边界 → 可验证证据</p></section>
+    <section><h2>演示顺序</h2><ol><li>SO100001：订单工具 + 9个 Checkpoint</li><li>发票税号：公共知识 RAG + Citation</li><li>SO200001：JWT 身份绑定 + 越权隐藏</li><li>SO100002：interrupt + reviewer + audit</li></ol></section>
+    <section><h2>页面证据</h2><ul><li><code>intent / confidence</code></li><li><code>planned_tool_call / tool_result</code></li><li><code>execute_order_tool</code></li><li><code>checkpoint_id / next / interrupt</code></li><li>引用标题、版本、生效日期</li></ul></section>
+    <section><h2>四个追问</h2><ul><li>为什么不是普通 Chain？——有环、暂停、恢复。</li><li>Checkpoint vs 业务表？——进度 vs 事实。</li><li>为什么不展示 CoT？——不可靠且会泄密。</li><li>为什么四种 Token？——职责分离与最小权限。</li></ul></section>
+    <section class="warning"><h2>不要夸大</h2><ul><li>本机双实例 ≠ 完整云生产集群</li><li>Hash Embedding ≠ 线上最终召回方案</li><li>离线 P95 ≠ 千问生产 SLA</li><li>Docker 默认演示不调用付费模型</li></ul></section>
+    <section><h2>现场失败时</h2><ul><li>先说清失败边界，不关闭 JWT 强行演示。</li><li>展示第13步评测与第14步千问报告。</li><li>展示 Checkpoint、架构与恢复演练证据。</li><li>说明下一步排查顺序，而不是猜原因。</li></ul></section>
+    <section><h2>演示前命令</h2><p><code>examples/21_interview_demo.py</code></p><p>看到：<strong>面试演示环境 READY</strong></p><p>快速复检参数：<code>--no-build</code></p></section>
+  </div>
+  <footer>凭证不截图 · Token 不落盘 · 真实数字只引用版本化报告</footer>
+</main>
+</body>
+</html>

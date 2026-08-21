@@ -1,0 +1,52 @@
+[
+  {
+    "document_id": "KB-REFUND-001",
+    "title": "七天无理由退货政策",
+    "content": "适用条件\n\n用户自签收商品之日起七个自然日内，可以申请七天无理由退货。商品应保持完好，包装、配件、赠品和发票应齐全，不影响二次销售。\n\n以下情况不适用七天无理由退货：消费者定制商品、鲜活易腐商品、在线下载或已经拆封的数字化商品，以及交付的报纸期刊。\n\n办理流程\n\n用户可在订单详情中选择“申请售后”，填写退货原因并上传必要凭证。审核通过后，系统会提供退货地址。仓库验收通过后，退款原路退回，具体到账时间以支付渠道为准。",
+    "source": "kb://serviceops/policies/refund",
+    "version": "2.1",
+    "effective_date": "2026-07-01",
+    "status": "published",
+    "access_scope": "public"
+  },
+  {
+    "document_id": "KB-INVOICE-001",
+    "title": "电子发票申请与开具说明",
+    "content": "申请条件\n\n订单完成支付后，用户可以在订单详情页申请电子普通发票。发票抬头可以选择个人或企业；企业抬头必须填写准确的企业名称和纳税人识别号。\n\n开具时间\n\n电子发票通常会在申请后的一个工作日内开具，并发送到用户填写的电子邮箱，同时可在订单详情页下载。\n\n信息修改\n\n发票尚未开具时可以撤回申请并重新填写。发票已经开具后，如抬头或税号有误，需要通过售后入口提交红冲重开申请，不应直接修改原发票文件。",
+    "source": "kb://serviceops/policies/invoice",
+    "version": "1.4",
+    "effective_date": "2026-06-15",
+    "status": "published",
+    "access_scope": "public"
+  },
+  {
+    "document_id": "KB-WARRANTY-001",
+    "title": "商品保修与维修服务规则",
+    "content": "保修期限\n\n商品保修期限以商品详情页、保修卡和法律规定为准。一般电子产品自签收之日起享受一年有限保修，但不同品牌和品类可能存在差异。\n\n保修凭证\n\n申请维修时需要提供订单号或有效购买凭证，并描述故障现象。属于保修范围的质量问题，检测、维修和约定范围内的物流费用由服务方承担。\n\n非保修情形\n\n人为损坏、未经授权的拆机维修、进水、不可抗力以及超过保修期限的故障，不属于免费保修范围。系统应先提供检测结果和报价，用户确认后才能进行付费维修。",
+    "source": "kb://serviceops/policies/warranty",
+    "version": "3.0",
+    "effective_date": "2026-05-01",
+    "status": "published",
+    "access_scope": "public"
+  },
+  {
+    "document_id": "KB-SUPPORT-001",
+    "title": "人工客服工作时间",
+    "content": "在线人工客服工作时间为北京时间每日 09:00 至 21:00，法定节假日的具体安排以服务公告为准。非人工服务时间提交的问题会进入待处理队列，并在下一服务时段按照提交顺序处理。涉及账号安全、疑似盗刷等紧急问题时，用户应通过安全中心提供的专用入口冻结相关操作。",
+    "source": "kb://serviceops/support/hours",
+    "version": "1.2",
+    "effective_date": "2026-08-01",
+    "status": "published",
+    "access_scope": "public"
+  },
+  {
+    "document_id": "KB-INTERNAL-001",
+    "title": "内部高价值客户补偿审批规则",
+    "content": "该文档仅供内部员工使用，不得作为公共客服回答证据。",
+    "source": "kb://serviceops/internal/compensation",
+    "version": "0.9",
+    "effective_date": "2026-08-01",
+    "status": "draft",
+    "access_scope": "internal"
+  }
+]

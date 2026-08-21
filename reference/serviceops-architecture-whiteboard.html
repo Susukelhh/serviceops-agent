@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceOps Agent 架构白板速查图</title>
+  <style>
+    :root { font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif; --ink:#16231e; --muted:#617068; --line:#d5e0da; --green:#126b4c; --soft:#eaf5ef; --amber:#96580d; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:#eef3f0; line-height:1.5; }
+    main { width:min(1160px,calc(100% - 26px)); margin:20px auto; padding:28px; border:1px solid var(--line); border-radius:20px; background:#fff; }
+    header { display:flex; justify-content:space-between; gap:24px; padding-bottom:16px; border-bottom:2px solid var(--ink); }
+    h1 { margin:0; font-size:27px; } header p { max-width:590px; margin:0; color:var(--muted); font-size:12px; }
+    .layers { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:24px; margin-top:20px; }
+    .layer { position:relative; padding:15px 12px; border:1px solid var(--line); border-radius:13px; background:#fff; }
+    .layer:not(:last-child)::after { position:absolute; z-index:2; top:50%; right:-19px; color:var(--green); content:"→"; font-weight:800; transform:translateY(-50%); }
+    .layer b,.layer span { display:block; } .layer b { font-size:13px; } .layer span { margin-top:5px; color:var(--muted); font-size:10px; }
+    .branches { display:grid; grid-template-columns:180px repeat(3,minmax(0,1fr)); gap:12px; align-items:stretch; margin-top:16px; }
+    .branch-title,.branch { padding:13px; border-radius:12px; } .branch-title { display:grid; place-items:center; color:#eef9f4; background:#15372b; font-weight:700; text-align:center; }
+    .branch { border:1px solid var(--line); background:var(--soft); } .branch b,.branch span { display:block; } .branch span { margin-top:4px; color:var(--muted); font-size:10px; }
+    .bottom { display:grid; grid-template-columns:1.1fr 1fr 1fr; gap:12px; margin-top:16px; }
+    section { padding:14px; border-top:1px solid var(--line); } h2 { margin:0 0 8px; color:var(--green); font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+    ul { margin:0; padding-left:18px; font-size:11px; } li+li { margin-top:5px; } code { color:var(--green); }
+    .boundary { background:#fff7e9; } .boundary h2 { color:var(--amber); }
+    footer { margin-top:15px; color:var(--muted); font-size:10px; text-align:right; }
+    @media(max-width:760px){ header{flex-direction:column}.layers,.branches,.bottom{grid-template-columns:1fr}.layer:not(:last-child)::after{top:auto;right:50%;bottom:-21px;content:"↓";transform:translateX(50%)} }
+    @media print { @page{size:A4 landscape;margin:9mm}body{background:#fff}main{width:100%;margin:0;padding:12px;border:0}.layers{gap:17px}.layer:not(:last-child)::after{right:-14px} }
+  </style>
+</head>
+<body>
+<main>
+  <header><div><h1>ServiceOps Agent 架构白板</h1><strong>五层主干 · 三条业务分支 · 三类数据</strong></div><p>模型只负责有限结构化决策；LangGraph 控制状态和流程；服务端工具真正行动；人工审批高风险写入；PostgreSQL 分别保存进度、事实与证据。</p></header>
+  <div class="layers" aria-label="五层主架构">
+    <div class="layer"><b>① 角色与入口</b><span>customer / reviewer / auditor / developer / operator</span></div>
+    <div class="layer"><b>② Nginx + API</b><span>限流、Schema、JWT/RBAC、容量保护</span></div>
+    <div class="layer"><b>③ LangGraph</b><span>State、条件边、工具环、interrupt / resume</span></div>
+    <div class="layer"><b>④ 执行与数据</b><span>工具、Qdrant、PostgreSQL、Outbox、审计</span></div>
+    <div class="layer"><b>⑤ 工程治理</b><span>OTel、Eval、CI、备份恢复、一键演示</span></div>
+  </div>
+  <div class="branches" aria-label="LangGraph三条主要业务分支">
+    <div class="branch-title">结构化意图分类</div>
+    <div class="branch"><b>FAQ</b><span>检索 → 证据门 → 回答门 → Citation</span></div>
+    <div class="branch"><b>订单</b><span>规划 → 白名单工具 → 观察 → 再规划 ↺</span></div>
+    <div class="branch"><b>退货</b><span>冻结草案 → interrupt → 人审 → resume → 幂等写</span></div>
+  </div>
+  <div class="bottom">
+    <section><h2>三类数据</h2><ul><li><b>Checkpoint：</b>流程做到哪里</li><li><b>业务表：</b>现实发生什么</li><li><b>审计表：</b>谁做了什么决定</li></ul></section>
+    <section><h2>关键证据</h2><ul><li>9 个订单 Checkpoint</li><li>13/13 Agent Eval</li><li>千问 3 轮 13/13</li><li>A 创建 / B 恢复</li><li>备份隔离恢复成功</li></ul></section>
+    <section class="boundary"><h2>诚实边界</h2><ul><li>本机双实例 ≠ 云生产集群</li><li>本地 HS256 ≠ 企业 OIDC</li><li>逻辑备份 ≠ PITR</li><li>Hash Embedding ≠ 最终线上召回</li></ul></section>
+  </div>
+  <footer>画图顺序：五层 → 三分支 → 三类数据 → 两个生产差距</footer>
+</main>
+</body>
+</html>

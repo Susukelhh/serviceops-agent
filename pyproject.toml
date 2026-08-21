@@ -1,0 +1,61 @@
+[project]
+name = "serviceops-agent"
+version = "0.1.0"
+description = "面向企业售后工单场景的可控、可评测 AI Agent"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "alembic>=1.19,<1.20",
+    "fastapi>=0.116,<1.0",
+    "langchain[openai]>=1.2,<2.0",
+    "langgraph>=1.0,<2.0",
+    "langgraph-checkpoint-postgres>=3.0,<4.0",
+    "langgraph-checkpoint-sqlite>=3.0,<4.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44,<2.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0,<1.0",
+    "opentelemetry-instrumentation-httpx>=0.65b0,<1.0",
+    "opentelemetry-sdk>=1.44,<2.0",
+    "pydantic-settings>=2.10,<3.0",
+    "pyjwt>=2.10,<3.0",
+    "psycopg[binary,pool]>=3.2,<4.0",
+    "qdrant-client>=1.15,<2.0",
+    "sqlalchemy>=2.0,<3.0",
+    "uvicorn[standard]>=0.35,<1.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28,<1.0",
+    "mypy>=1.17,<2.0",
+    "pytest>=8.4,<10.0",
+    "pytest-asyncio>=1.1,<2.0",
+    "ruff>=0.12,<1.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/serviceops_agent"]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["serviceops_agent"]

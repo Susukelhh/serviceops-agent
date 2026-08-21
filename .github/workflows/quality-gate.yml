@@ -1,0 +1,96 @@
+# 工作流名称会显示在 GitHub Actions 和分支保护的 Required checks 中。
+name: ServiceOps offline quality gate
+
+# push、pull_request 和手工触发都只运行零费用确定性检查。
+on:
+  # main 的每次更新重新验证可合并状态。
+  push:
+    branches: [main]
+  # 所有 Pull Request 在合并前执行相同质量门；本工作流不读取任何 Secret。
+  pull_request:
+  # workflow_dispatch 方便第一次上传仓库后手工验证 CI 环境。
+  workflow_dispatch:
+
+# 默认 GITHUB_TOKEN 只需要读取当前仓库内容，不授予写代码、Issue 或部署权限。
+permissions:
+  contents: read
+
+# 同一分支的新提交会取消过时的离线检查，节省 Runner 时间且不会浪费外部模型额度。
+concurrency:
+  group: offline-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    # Job 名称适合作为 main 分支保护中的必需状态检查。
+    name: Ruff, Mypy, Pytest and Agent eval
+    # Ubuntu Runner 与本地 Windows 形成一次跨平台验证。
+    runs-on: ubuntu-latest
+    # 防止依赖或测试异常时无限占用 Runner。
+    timeout-minutes: 20
+    # 全部后端显式离线，仓库即使以后配置 GitHub Secret 也不会在 PR 中调用模型。
+    env:
+      PYTHONUTF8: "1"
+      PYTHONUNBUFFERED: "1"
+      SERVICEOPS_ENVIRONMENT: test
+      SERVICEOPS_LLM_BACKEND: mock
+      SERVICEOPS_AGENT_PLANNER_BACKEND: deterministic
+      SERVICEOPS_EMBEDDING_BACKEND: hash
+      SERVICEOPS_RAG_GENERATION_BACKEND: extractive
+      SERVICEOPS_QDRANT_LOCATION: ":memory:"
+      SERVICEOPS_PERSISTENCE_BACKEND: memory
+      SERVICEOPS_TELEMETRY_ENABLED: "false"
+    steps:
+      # Action 锁定完整提交 SHA，后方注释保留人工可读发布版本。
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 质量门不执行 git push，因此不把临时凭据留给后续 Python 代码。
+          persist-credentials: false
+
+      # setup-uv 同样锁定完整 SHA，并缓存由 uv.lock 决定的下载内容。
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          # 固定 uv 版本，避免包管理器自动升级导致同一提交行为漂移。
+          version: "0.12.1"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # .python-version 当前固定为 3.12；显式命令使日志能清楚展示解释器安装阶段。
+      - name: Install pinned Python
+        run: uv python install 3.12
+
+      # --frozen 禁止 CI 自动改写锁文件或临时解析出未评审的新依赖。
+      - name: Sync locked dependencies
+        run: uv sync --frozen --all-groups
+
+      # Ruff 检查格式之外的导入、潜在 Bug 和现代 Python 规则。
+      - name: Run Ruff
+        run: uv run --frozen ruff check .
+
+      # strict Mypy 检查 src 下所有生产模块的类型边界。
+      - name: Run Mypy
+        run: uv run --frozen mypy src
+
+      # 全量 Pytest 覆盖节点、图、API、安全、持久化、Outbox 和评测器。
+      - name: Run Pytest
+        run: uv run --frozen pytest -q
+
+      # 第十三步脚本真实执行 13 条完整 LangGraph；失败时自动返回退出码 1。
+      - name: Run deterministic Agent quality gate
+        run: >-
+          uv run --frozen python examples/13_agent_end_to_end_evaluation.py
+          --report data/runtime/agent_end_to_end_report.json
+
+      # 即使前一步质量门失败，只要报告已经生成，就保留逐样本证据用于下载分析。
+      - name: Upload Agent evaluation report
+        if: ${{ always() && hashFiles('data/runtime/agent_end_to_end_report.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # run_id 让每次产物名唯一，避免多次运行混淆。
+          name: offline-agent-evaluation-${{ github.run_id }}
+          path: data/runtime/agent_end_to_end_report.json
+          if-no-files-found: error
+          # 合成评测报告保留 14 天足够排查，同时控制仓库存储成本。
+          retention-days: 14

@@ -1,0 +1,12 @@
+[
+  {"case_id":"rank-holdout-return-inspection","question":"为了检查功能拆盒调试过，但没有明显使用痕迹，普通货品还能申请七日退吗？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["return-pair","paraphrase"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-custom-size","question":"家具按我填写的专属尺寸生产后发现填错了，非质量问题能退吗？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["return-pair","customized"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-freight-damaged","question":"运输途中把商品弄坏了，寄回和重新发出的物流费用由哪方出？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_retrieve":true,"tags":["return-pair","responsibility"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-warranty-quote","question":"超过保修期限维修，检测完成后是否应该先给报价再动手？","expected_document_ids":["KB-WARRANTY-GENERAL-001"],"should_retrieve":true,"tags":["warranty-pair","paid-repair"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-liquid-dry","question":"设备淋雨以后能不能用热风吹干，送修前还要取出哪些东西？","expected_document_ids":["KB-WARRANTY-LIQUID-001"],"should_retrieve":true,"tags":["warranty-pair","procedure"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-invoice-email","question":"票还没开出来时邮箱和公司抬头填错了，从哪里撤回重填？","expected_document_ids":["KB-INVOICE-GENERAL-001"],"should_retrieve":true,"tags":["invoice-pair","pending"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-invoice-red-status","question":"旧电子票已经红冲后还能报销吗，新票什么时候出现在记录里？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["invoice-pair","correction"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-logistics-change","question":"快递已经出库，转寄别的城市能保证成功吗，会不会产生额外费用？","expected_document_ids":["KB-LOGISTICS-DELAY-001"],"should_retrieve":true,"tags":["logistics-pair","address"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-logistics-frontdesk","question":"物流标记前台代收，但前台确认没有，应该怎样发起投递核查？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["logistics-pair","signed-missing"],"difficulty":"hard"},
+  {"case_id":"rank-holdout-price-refund","question":"订单正在部分退货时还能同时计算降价补偿吗？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_retrieve":true,"tags":["pricing","cross-process"],"difficulty":"hard"}
+]

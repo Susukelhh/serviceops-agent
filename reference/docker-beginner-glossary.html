@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docker 白话术语表</title>
+  <style>
+    :root { --ink:#182133; --muted:#626b7b; --blue:#2657d8; --line:#dfe4eb; --paper:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f3f6fb; color:var(--ink); font:16px/1.65 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(900px,calc(100% - 28px)); margin:30px auto; padding:clamp(22px,5vw,50px); background:var(--paper); border:1px solid var(--line); border-radius:20px; box-shadow:0 18px 55px rgba(35,53,88,.1); }
+    h1 { margin:.1em 0 .35em; font-size:clamp(32px,5vw,48px); }
+    p { color:var(--muted); }
+    table { width:100%; border-collapse:collapse; margin-top:22px; }
+    th,td { padding:13px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--blue); }
+    code { background:#eef2f7; border-radius:5px; padding:.12em .35em; }
+    .rule { margin-top:24px; padding:16px 19px; border-left:5px solid #148064; background:#eef9f5; border-radius:9px; color:var(--ink); }
+    a { color:var(--blue); }
+    @media (max-width:650px) { th:nth-child(3),td:nth-child(3) { display:none; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Docker 白话术语表</h1>
+  <p>第一次遇到专业词时先看“白话解释”，暂时不需要背完整定义。</p>
+  <table>
+    <thead><tr><th>术语</th><th>白话解释</th><th>ServiceOps 示例</th></tr></thead>
+    <tbody>
+      <tr><td>Docker</td><td>负责制作和运行标准化程序包装的工具</td><td>让 Agent 离开 PyCharm 也能按同样方式启动</td></tr>
+      <tr><td>Dockerfile</td><td>制作包装的说明书</td><td>规定 Python 版本、依赖和启动命令</td></tr>
+      <tr><td>镜像 Image</td><td>做好但尚未运行的程序模板</td><td><code>serviceops-agent:local</code></td></tr>
+      <tr><td>容器 Container</td><td>镜像启动后正在运行的一份程序</td><td>当前正在营业的 Agent API</td></tr>
+      <tr><td>Compose</td><td>一次管理一组容器及其配置的清单</td><td><code>compose.yaml</code> 规定端口、数据库卷和运行环境</td></tr>
+      <tr><td>端口 Port</td><td>程序对外提供服务的窗口编号</td><td>浏览器通过 <code>8000</code> 找到 Agent</td></tr>
+      <tr><td>数据卷 Volume</td><td>独立于容器的长期存储柜</td><td>保存 Checkpoint 和业务 SQLite 文件</td></tr>
+      <tr><td>Build</td><td>根据说明书制作镜像</td><td><code>docker compose build</code></td></tr>
+      <tr><td>Up</td><td>启动容器</td><td><code>docker compose up</code></td></tr>
+      <tr><td>Down</td><td>停止并移除容器</td><td>默认保留数据卷，不等于删除业务数据</td></tr>
+      <tr><td>Health check</td><td>定期检查程序是否能正常接待请求</td><td>访问 <code>/ready</code> 检查四个依赖</td></tr>
+    </tbody>
+  </table>
+  <div class="rule"><strong>最重要的区别：</strong>镜像是“模板”，容器是“模板启动后正在运行的一份实例”，数据卷是“容器关掉后仍然保留的档案柜”。</div>
+  <p><a href="../lessons/0006-docker-in-plain-chinese.html">返回：用开餐厅理解 Docker</a></p>
+</main>
+</body>
+</html>

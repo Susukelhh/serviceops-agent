@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第16课：RAG优化前为什么先做困难基线</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#1d252f;--muted:#647180;--blue:#2457d6;--soft:#eef3ff;--red:#a83a32;--green:#18715a;--line:#dce3ec}*{box-sizing:border-box}body{margin:0;background:#f2f5f9;color:var(--ink);line-height:1.72}main{width:min(980px,calc(100% - 28px));margin:28px auto;padding:clamp(22px,5vw,54px);background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 20px 60px rgba(38,53,74,.09)}.eyebrow{margin:0;color:var(--blue);font-size:12px;font-weight:800;letter-spacing:.14em}h1{margin:7px 0 10px;font-family:Georgia,"Songti SC",serif;font-size:clamp(30px,5vw,48px);line-height:1.15}h2{margin:34px 0 12px;font-size:21px}.lead{max-width:780px;color:var(--muted);font-size:17px}.analogy,.warning,.practice{margin:20px 0;padding:18px 20px;border-radius:15px}.analogy{border-left:4px solid var(--blue);background:var(--soft)}.warning{border:1px solid #f0c9c5;background:#fff4f2}.practice{border:1px solid #b9dece;background:#f0fbf6}.pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;margin:24px 0}.step{position:relative;padding:14px 10px;text-align:center;border:1px solid var(--line);border-radius:12px;background:#fff}.step:not(:last-child)::after{position:absolute;right:-17px;top:50%;content:"→";color:var(--blue);transform:translateY(-50%)}.metric{display:grid;grid-template-columns:1fr auto;gap:8px 22px;margin:16px 0;padding:18px;border-radius:14px;background:#152438;color:#edf5ff}.metric span:nth-child(even){font-weight:800}details{margin:10px 0;padding:13px 15px;border:1px solid var(--line);border-radius:12px}summary{cursor:pointer;font-weight:750}details p{color:var(--muted)}code{padding:2px 5px;border-radius:5px;background:#eef1f5}a{color:var(--blue);text-underline-offset:3px}footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}@media(max-width:760px){.pipeline{grid-template-columns:1fr}.step:not(:last-child)::after{right:50%;top:auto;bottom:-21px;content:"↓";transform:translateX(50%)}}@media print{body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none}}
+  </style>
+</head>
+<body><main>
+  <p class="eyebrow">SERVICEOPS AGENT · LESSON 16</p>
+  <h1>RAG 优化前，先让旧方案“考砸一次”</h1>
+  <p class="lead">这节课的目标不是记住 RRF、Rerank 等名词，而是学会用实验回答：旧方案到底有什么问题，为什么下一项技术值得加入。</p>
+
+  <section class="analogy"><strong>生活类比：先体检，再开药</strong><p>如果一个人没有检查就同时吃五种药，即使后来舒服了，也不知道哪种药有效、哪种带来副作用。RAG 也一样：先固定旧方案并记录症状，再一次只改变少量因素。</p></section>
+
+  <div class="pipeline" aria-label="问题驱动优化流程">
+    <div class="step"><strong>设计困难题</strong><br><small>不是背原文</small></div>
+    <div class="step"><strong>冻结基线</strong><br><small>参数不迁就结果</small></div>
+    <div class="step"><strong>分类失败</strong><br><small>召回/排序/拒答</small></div>
+    <div class="step"><strong>单变量候选</strong><br><small>技术对应问题</small></div>
+    <div class="step"><strong>锁定集验收</strong><br><small>防止过拟合</small></div>
+  </div>
+
+  <h2>为什么 Recall@5 = 100% 仍然不够</h2>
+  <div class="metric"><span>Recall@5</span><span>100.0%</span><span>Top-1 准确率</span><span>87.5%</span><span>负例误召回率</span><span>100.0%</span></div>
+  <p>它只说明每道知识内问题的前五名中出现了正确文档。它没有保证正确文档排第一，也没有保证天气、股票、医疗问题不会获得企业政策证据。把噪声交给生成模型，仍可能增加幻觉风险和上下文成本。</p>
+
+  <h2>什么时候才有理由使用 Rerank</h2>
+  <details><summary>正确文档根本没有进入候选</summary><p>Rerank 无法重排一个不存在的候选。优先检查切片、查询改写、Embedding 和混合召回。</p></details>
+  <details><summary>正确文档已经进入 Top-K，但排在第二或第三</summary><p>这是合理的排序问题。可以比较无重排、规则重排和模型 Rerank 的 Top-1/MRR、延迟与费用。</p></details>
+  <details><summary>域外问题也返回了一堆政策</summary><p>先处理意图边界和拒答阈值。Rerank 只能改变顺序，不一定能证明“一个都不该返回”。</p></details>
+
+  <section class="warning"><strong>锁定集不是第二个调参集</strong><p>开发集像平时练习册，可以反复分析；锁定集像正式模拟考，只在候选和参数确定后验收一次。看过答案再改参数，得到的高分不能证明对新问题有效。</p></section>
+
+  <section class="practice"><strong>15分钟动手练习</strong><p>运行 <code>examples/24_rag_problem_baseline.py</code>，从输出中各选一条排序靠后和负例误召回。对每条写下：症状、可能根因、最小候选、观察指标、可能代价。不要先写技术名词。</p></section>
+
+  <h2>可信资料</h2>
+  <p>向量与关键词混合检索可参考 <a href="https://qdrant.tech/documentation/search/text-search/hybrid-search/">Qdrant 官方 Hybrid Search</a>；候选重排流程可参考 <a href="https://qdrant.tech/documentation/tutorials-basics/reranking-hybrid-search/">Qdrant 官方 Reranking 教程</a>；真实向量模型以 <a href="https://help.aliyun.com/en/model-studio/embedding">阿里云百炼 Embedding 官方说明</a>为准。</p>
+  <p><a href="../docs/steps/24-problem-driven-rag-baseline.md">查看完整实验记录</a> · <a href="../reference/rag-problem-experiment-card.html">打开一页式实验卡</a></p>
+  <footer>下次复习提醒：先说失败类型，再说技术；先说开发集，再说锁定集。</footer>
+</main></body></html>

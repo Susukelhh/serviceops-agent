@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第七课：用档案柜理解 SQLite 与 PostgreSQL</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#60697a; --blue:#2859d8; --green:#117861; --orange:#bd5b19; --paper:#fff; --line:#dfe4eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#eef4ff,#fffaf2 52%,#edf9f4); color:var(--ink); font:17px/1.73 system-ui,"Microsoft YaHei",sans-serif; }
+    main { width:min(950px,calc(100% - 30px)); margin:32px auto; padding:clamp(23px,5vw,56px); background:rgba(255,255,255,.97); border:1px solid var(--line); border-radius:22px; box-shadow:0 20px 65px rgba(31,52,91,.12); }
+    h1 { margin:.15em 0 .35em; font:800 clamp(34px,6vw,55px)/1.12 Georgia,"Songti SC",serif; letter-spacing:-.035em; }
+    h2 { margin:2em 0 .55em; font-size:1.42rem; }
+    .eyebrow { color:var(--blue); font-weight:780; letter-spacing:.08em; }
+    .lead { color:var(--muted); font-size:1.12rem; }
+    .answer { background:#edf9f4; border-left:5px solid var(--green); border-radius:10px; padding:16px 20px; }
+    .pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; margin:20px 0; }
+    .card { padding:20px; border:1px solid var(--line); border-radius:16px; background:#fffdfa; }
+    .card h3 { margin:0 0 8px; color:var(--blue); }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:11px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); }
+    code { background:#eef2f7; border-radius:6px; padding:.12em .4em; }
+    pre { overflow:auto; background:#111827; color:#f1f5ff; border-radius:14px; padding:18px; line-height:1.6; }
+    .warn { background:#fff4e8; border-left:5px solid var(--orange); border-radius:10px; padding:16px 20px; }
+    .interview { background:#f0f5ff; border:1px solid #ccd9fb; border-radius:14px; padding:18px; }
+    .quiz { margin-top:18px; padding:20px; border:1px solid var(--line); border-radius:15px; background:#f8f9fc; }
+    button { margin:9px 8px 0 0; padding:8px 18px; border:1px solid #b9c4d8; border-radius:999px; background:white; font:inherit; cursor:pointer; }
+    button:hover { color:var(--blue); border-color:var(--blue); }
+    #feedback { min-height:1.8em; margin-top:8px; font-weight:750; }
+    nav { display:flex; flex-wrap:wrap; gap:16px; margin-top:32px; padding-top:18px; border-top:1px solid var(--line); }
+    a { color:var(--blue); text-underline-offset:3px; }
+    small { color:var(--muted); }
+    @media (max-width:700px) { .pair { grid-template-columns:1fr; } main { margin:14px auto; } }
+    @media print { body { background:white; } main { box-shadow:none; border:0; margin:0 auto; } button { display:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">ServiceOps Agent · 零基础 8 分钟</div>
+  <h1>SQLite 是个人抽屉，PostgreSQL 是共享档案室</h1>
+  <p class="lead">这一课只解决一个问题：我们已经有 SQLite，为什么下一步还要引入 PostgreSQL？</p>
+
+  <div class="answer"><strong>一句话答案：</strong>SQLite适合一份程序在本地管理自己的文件；PostgreSQL适合多份程序通过网络共同使用一套数据。</div>
+
+  <h2>先用档案柜理解</h2>
+  <div class="pair">
+    <section class="card">
+      <h3>SQLite：个人抽屉</h3>
+      <p>Agent旁边放着一个数据库文件，程序直接打开、读取和修改。安装简单，适合学习、单机演示和小型工具。</p>
+    </section>
+    <section class="card">
+      <h3>PostgreSQL：共享档案室</h3>
+      <p>数据库是一个独立运行的服务，多个 Agent都向档案管理员发送请求。管理员统一处理读取、写入、权限和同时操作。</p>
+    </section>
+  </div>
+
+  <h2>当前项目为什么先用 SQLite</h2>
+  <p>目前只有一个 ServiceOps Agent容器，SQLite文件和它放在同一套本地 Docker环境里。这就像只有一名员工使用自己的档案抽屉：便宜、简单、方便调试。</p>
+  <pre><code>一个 Agent 容器
+      ↓ 直接打开文件
+checkpoints.sqlite3
+serviceops.sqlite3</code></pre>
+  <p>这不是“落后技术”，而是当前单机阶段合适的选择。SQLite官方也强调，它和 PostgreSQL解决的是不同问题。</p>
+
+  <h2>多个 Agent容器会遇到什么问题</h2>
+  <p>以后为了接待更多用户，我们可能同时启动多个 Agent容器。如果每个容器都有自己的 SQLite抽屉：</p>
+  <pre><code>用户第一次请求 → Agent A → A 的 SQLite 有聊天记录
+用户第二次请求 → Agent B → B 的 SQLite 没有那条记录</code></pre>
+  <p>用户会觉得 Agent“失忆”。而且多个程序同时争抢同一个网络文件，也不是 SQLite最适合的使用方式。</p>
+
+  <h2>换成 PostgreSQL 后</h2>
+  <pre><code>Agent A ─┐
+Agent B ─┼── 通过网络请求 ──→ PostgreSQL 共享档案室
+Agent C ─┘                       保存统一状态</code></pre>
+  <p>无论用户的请求落到 A、B 还是 C，它们都能访问同一套聊天状态、退货记录和审批记录。这就是“共享状态”。</p>
+
+  <table>
+    <thead><tr><th>比较</th><th>SQLite</th><th>PostgreSQL</th></tr></thead>
+    <tbody>
+      <tr><td>形态</td><td>应用直接读写本地文件</td><td>独立数据库服务接受连接</td></tr>
+      <tr><td>适合</td><td>学习、单机、小工具</td><td>多人、多程序、服务器应用</td></tr>
+      <tr><td>安装维护</td><td>简单</td><td>需要账号、端口、备份等管理</td></tr>
+      <tr><td>当前项目</td><td>保留为单机学习模式</td><td>Docker Compose 默认模式，已经接入</td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn"><strong>不要得到错误结论：</strong>PostgreSQL不是永远优于 SQLite。个人记事本不需要建设公司档案中心；但当多个 Agent实例需要共享数据时，公司档案室式的数据库更合适。</div>
+
+  <h2>和 LangGraph有什么关系</h2>
+  <p>LangGraph的 Checkpointer可以理解为“对话进度存档员”。用户说到一半、等待人工审批或服务重启时，它负责保存图执行到了哪里。项目现在已使用官方 PostgreSQL Saver，让多个 Agent容器能够读取同一份进度；SQLite仍保留给不启动 Docker 的单机学习。</p>
+
+  <div class="interview"><strong>面试表达：</strong>项目早期使用 SQLite降低本地开发复杂度；容器化验证后，为支持多实例共享 Checkpoint和业务状态，已经迁移到 PostgreSQL。迁移目的不是堆技术名词，而是解决多实例状态共享和并发访问问题；SQLite仍作为本地回退模式。</div>
+
+  <div class="quiz">
+    <strong>小测验：</strong>三份 Agent容器需要共同读取同一用户的对话进度，更像需要哪一种存储？
+    <div><button onclick="answer(false)">个人抽屉</button><button onclick="answer(true)">共享档案</button></div>
+    <div id="feedback" aria-live="polite"></div>
+  </div>
+
+  <p><small>一手资料：<a href="https://www.sqlite.org/whentouse.html">SQLite官方适用场景</a>、<a href="https://www.postgresql.org/docs/current/tutorial-arch.html">PostgreSQL官方客户端/服务器架构</a>、<a href="https://docs.langchain.com/oss/python/langgraph/add-memory">LangGraph官方生产持久化示例</a>。遇到不懂的词请直接问，不需要先背 SQL。</small></p>
+  <nav>
+    <a href="0006-docker-in-plain-chinese.html">← 上一课：用开餐厅理解 Docker</a>
+    <a href="0008-postgresql-transaction-and-pool.html">下一课：连接池、事务与重建验证 →</a>
+    <a href="../reference/database-beginner-glossary.html">打开：数据库白话术语表</a>
+  </nav>
+</main>
+<script>
+  function answer(correct) {
+    const target = document.getElementById('feedback');
+    target.textContent = correct ? '答对了：多份程序共享同一套数据，需要独立的共享数据库服务。' : '再想想：每个程序各有一个抽屉，会导致同一用户的记录分散在不同地方。';
+    target.style.color = correct ? '#117861' : '#a33a3a';
+  }
+</script>
+</body>
+</html>

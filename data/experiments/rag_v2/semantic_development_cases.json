@@ -1,0 +1,18 @@
+[
+  {"case_id":"semantic-dev-return-regret","question":"东西到手看了一眼，基本没碰，现在改变主意还能撤回这笔购买吗？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["semantic-paraphrase","low-overlap","return"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-custom-personalized","question":"杯子已经按我给的姓名做成专属款，我临时不想要了怎么办？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["semantic-paraphrase","customized"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-digital-bound","question":"线上权益已经挂到我的账户名下，还能恢复成没买过的状态吗？","expected_document_ids":["KB-DIGITAL-GOODS-001"],"should_retrieve":true,"tags":["semantic-paraphrase","digital"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-freight-merchant-fault","question":"卖家装错了型号，我把它寄回去产生的钱应该找谁？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_retrieve":true,"tags":["semantic-paraphrase","responsibility"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-warranty-third-party","question":"设备之前让路边的小店打开修理过，厂家还会白修吗？","expected_document_ids":["KB-WARRANTY-GENERAL-001"],"should_retrieve":true,"tags":["semantic-paraphrase","warranty"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-liquid-keyboard","question":"咖啡翻在键盘上以后机器黑屏了，这种情况售后怎么算？","expected_document_ids":["KB-WARRANTY-LIQUID-001"],"should_retrieve":true,"tags":["semantic-paraphrase","liquid-damage"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-invoice-wait","question":"报销凭证提交后一直没生成，我大概要等到什么时候，从哪拿到文件？","expected_document_ids":["KB-INVOICE-GENERAL-001"],"should_retrieve":true,"tags":["semantic-paraphrase","invoice"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-invoice-company-code","question":"公司编号填错了，可那张票已经生效，怎样换成正确的？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["semantic-paraphrase","invoice-correction"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-logistics-frozen","question":"运输信息像卡住了一样好几天不变化，平台能帮我追一下吗？","expected_document_ids":["KB-LOGISTICS-DELAY-001"],"should_retrieve":true,"tags":["semantic-paraphrase","logistics-delay"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-logistics-completed-empty","question":"系统说交付完成，可我本人和周围代收点都没有见到货，下一步呢？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["semantic-paraphrase","signed-missing"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-price-immediate-drop","question":"我刚成交它就变便宜了，符合条件的话差的那部分怎么拿回来？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_retrieve":true,"tags":["semantic-paraphrase","price-protection"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-account-emergency","question":"发现有人冒用我的账户消费，现在最先应该阻止哪些操作？","expected_document_ids":["KB-SUPPORT-SECURITY-001"],"should_retrieve":true,"tags":["semantic-paraphrase","security"],"difficulty":"hard"},
+  {"case_id":"semantic-dev-negative-install","question":"你们能派师傅上门安装新买的洗衣机吗？","expected_document_ids":[],"should_retrieve":false,"tags":["near-domain","knowledge-gap"],"difficulty":"adversarial"},
+  {"case_id":"semantic-dev-negative-points","question":"商城积分会在什么时候清零，会员怎样升级？","expected_document_ids":[],"should_retrieve":false,"tags":["near-domain","knowledge-gap"],"difficulty":"adversarial"},
+  {"case_id":"semantic-dev-negative-installment","question":"下单时能分多少期，哪些银行卡免手续费？","expected_document_ids":[],"should_retrieve":false,"tags":["near-domain","knowledge-gap"],"difficulty":"adversarial"},
+  {"case_id":"semantic-dev-negative-overseas","question":"把机器带到国外后可以去当地服务点享受全球联保吗？","expected_document_ids":[],"should_retrieve":false,"tags":["near-domain","knowledge-gap"],"difficulty":"adversarial"}
+]

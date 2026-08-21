@@ -1,0 +1,81 @@
+{
+  "artifact_type": "sanitized_frozen_experiment_summary",
+  "experiment_id": "serviceops-rag-end-to-end-candidate",
+  "experiment_version": "1.0.0",
+  "candidate_profile_id": "qwen-e2e-rag-v1",
+  "candidate_fingerprint": "197c37b7c7e888a685eb5e4d1a79b99b648da11f04311cdbe1a52bd61f649f47",
+  "embedding_model": "qwen3.7-text-embedding",
+  "chat_model": "qwen-plus",
+  "actual_embedding_requests": 4,
+  "actual_embedding_input_tokens": 5340,
+  "actual_chat_calls": 22,
+  "source_runtime_report_sha256": "9c952a738e062fbe8cdee21f9140875d8584de867515f9dd79daa3b7b559fd9b",
+  "development": {
+    "baseline": {
+      "total_cases": 16,
+      "answerable_cases": 11,
+      "unanswerable_cases": 5,
+      "retrieval_recall": 1.0,
+      "top_1_accuracy": 0.9090909090909091,
+      "answerable_recall": 1.0,
+      "abstention_accuracy": 0.6,
+      "decision_accuracy": 0.875,
+      "unsupported_answer_rate": 0.4,
+      "citation_validity": 1.0,
+      "quality_gate_passed": false,
+      "failed_case_ids": [
+        "e2e-dev-gap-payment",
+        "e2e-dev-gap-home-pickup"
+      ]
+    },
+    "candidate": {
+      "total_cases": 16,
+      "answerable_cases": 11,
+      "unanswerable_cases": 5,
+      "retrieval_recall": 1.0,
+      "top_1_accuracy": 1.0,
+      "answerable_recall": 1.0,
+      "abstention_accuracy": 0.8,
+      "decision_accuracy": 0.9375,
+      "unsupported_answer_rate": 0.2,
+      "citation_validity": 1.0,
+      "quality_gate_passed": true,
+      "failed_case_ids": ["e2e-dev-gap-home-pickup"]
+    }
+  },
+  "holdout": {
+    "baseline": {
+      "total_cases": 12,
+      "answerable_cases": 8,
+      "unanswerable_cases": 4,
+      "retrieval_recall": 1.0,
+      "top_1_accuracy": 1.0,
+      "answerable_recall": 1.0,
+      "abstention_accuracy": 0.5,
+      "decision_accuracy": 0.8333333333333334,
+      "unsupported_answer_rate": 0.5,
+      "citation_validity": 1.0,
+      "quality_gate_passed": false,
+      "failed_case_ids": [
+        "e2e-holdout-gap-gift-card",
+        "e2e-holdout-gap-weekend-delivery"
+      ]
+    },
+    "candidate": {
+      "total_cases": 12,
+      "answerable_cases": 8,
+      "unanswerable_cases": 4,
+      "retrieval_recall": 1.0,
+      "top_1_accuracy": 1.0,
+      "answerable_recall": 1.0,
+      "abstention_accuracy": 1.0,
+      "decision_accuracy": 1.0,
+      "unsupported_answer_rate": 0.0,
+      "citation_validity": 1.0,
+      "quality_gate_passed": true,
+      "failed_case_ids": []
+    }
+  },
+  "privacy_boundary": "This artifact excludes API keys, question text, answer text, hidden reasoning, vectors, and user data.",
+  "claim_boundary": "The 100% holdout metrics describe 12 versioned cases only and are not online production accuracy."
+}
