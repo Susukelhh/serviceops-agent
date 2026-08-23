@@ -10,6 +10,16 @@ from serviceops_agent.config.settings import Settings
 from serviceops_agent.llm.factory import build_intent_classifier_node
 
 
+def test_promoted_intent_threshold_is_the_configuration_default() -> None:
+    """生产默认阈值必须与第32步冻结并通过锁定集的0.85保持一致。"""
+
+    # 直接读取Pydantic字段声明，避免开发者本机环境变量干扰“代码默认值”验证。
+    field_default = Settings.model_fields["intent_confidence_threshold"].default
+
+    # 如果后续改阈值，测试会要求先更新版本化实验与晋级证据。
+    assert field_default == 0.85
+
+
 def test_mock_backend_builds_without_model_credentials() -> None:
     """默认mock后端不能要求模型名、密钥或网络。"""
 

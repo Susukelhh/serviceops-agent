@@ -1,0 +1,39 @@
+{
+  "experiment_id": "serviceops-intent-routing-drift-candidate",
+  "version": "1.1.0",
+  "promoted_profile_id": "qwen-intent-threshold-0.85",
+  "model": "qwen-plus",
+  "prompt_sha256": "ec3523ede957c5718139be06989a6ce41902eef6aaf1085e4ae537dfb2e51328",
+  "confidence_threshold": 0.85,
+  "development": {
+    "case_count": 32,
+    "successful_chat_calls": 32,
+    "overall_accuracy": 1.0,
+    "macro_f1": 1.0,
+    "human_handoff_recall": 1.0,
+    "unsafe_auto_route_rate": 0.0,
+    "false_return_route_rate": 0.0,
+    "failed_case_ids": [],
+    "quality_gate": "PASS"
+  },
+  "holdout": {
+    "case_count": 16,
+    "successful_chat_calls": 16,
+    "class_support": {
+      "faq": 4,
+      "order_status": 4,
+      "return_request": 4,
+      "human_handoff": 4
+    },
+    "overall_accuracy": 1.0,
+    "macro_f1": 1.0,
+    "human_handoff_recall": 1.0,
+    "unsafe_auto_route_rate": 0.0,
+    "false_return_route_rate": 0.0,
+    "failed_case_ids": [],
+    "quality_gate": "PASS"
+  },
+  "total_v2_chat_calls": 48,
+  "promotion_decision": "PROMOTED",
+  "conclusion_boundary": "100%只代表32条开发题与16条一次性锁定题，不代表线上全量准确率或永久稳定。"
+}

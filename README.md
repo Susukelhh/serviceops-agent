@@ -348,6 +348,14 @@ uv run python examples/31_hybrid_retrieval_experiment.py
 开发优胜的关键词权重1.50没有晋级生产，下一步以这两个Bad Case驱动意图分类实验。详见
 [`docs/steps/31-independent-qdrant-hybrid-retrieval-experiment.md`](docs/steps/31-independent-qdrant-hybrid-retrieval-experiment.md)。
 
+第32步把意图分类从13条整图回归中拆出，建立32条四分类困难开发题和16条新锁定题。关键词基线Accuracy
+62.5%、Macro-F1 65.1%、危险自动放行率40%；千问生产提示v1提升到87.5%，但仍有两条0.95置信度的
+危险放行，证明调阈值无效。提示v2明确公开规则、订单事实、退货写动作和域外任务边界后，冻结Profile
+`qwen-intent-threshold-0.85`在32条开发与16条一次性锁定题上Accuracy、Macro-F1、Human Recall均为
+100%，Unsafe Auto和False Return均为0，Gate PASS。结果只代表48条受控题，真实模型模式已晋级v2；
+默认离线/CI仍使用零费用关键词分类器。详见
+[`docs/steps/32-intent-classification-drift-experiment.md`](docs/steps/32-intent-classification-drift-experiment.md)。
+
 运行两个订单的可控工具循环与最大步数安全停止演示：
 
 ```powershell

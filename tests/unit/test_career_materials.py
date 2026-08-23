@@ -59,9 +59,9 @@ def test_resume_metrics_match_versioned_project_evidence() -> None:
     assert "`qwen-plus` 候选模型 1.1.0 连续 3 轮复测" in resume
     assert "每轮 13/13" in resume
     assert "小型黄金集" in resume
-    # 第26步结束时的完整门禁数字可以写，但必须明确它是本地测试结果。
-    # 第30步新增2条发布验收测试后，总数从185更新为187。
-    assert "当前本地测试为 187 passed、2 skipped" in resume
+    # 当前完整门禁数字可以写，但必须明确它是本地测试结果。
+    # 第32步加入意图专项与晋级保护后，总数更新为202。
+    assert "当前本地测试为 202 passed、2 skipped" in resume
     # 证据地图必须明确禁止把小样本结果外推为永久或线上 100%。
     assert "不能说“Agent 准确率永久 100%”" in evidence
     assert "不外推线上准确率" in evidence

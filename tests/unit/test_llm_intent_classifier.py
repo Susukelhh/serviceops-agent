@@ -202,6 +202,19 @@ def test_classifier_prompt_routes_non_public_internal_policy_to_human() -> None:
     """分类提示必须明确约束非公开政策，不能依赖模型自行猜测公开范围。"""
 
     # Assert：三个关键边界词共同覆盖本次真实失败样本及相邻的审批/风控问题。
-    assert "非公开内部信息" in CLASSIFIER_SYSTEM_PROMPT
-    assert "特殊客户补偿标准" in CLASSIFIER_SYSTEM_PROMPT
-    assert "必须分类为 human_handoff" in CLASSIFIER_SYSTEM_PROMPT
+    assert "非公开内部政策" in CLASSIFIER_SYSTEM_PROMPT
+    assert "天气、投资、医疗、写作" in CLASSIFIER_SYSTEM_PROMPT
+    assert "也必须选择human_handoff" in CLASSIFIER_SYSTEM_PROMPT
+
+
+def test_promoted_prompt_fingerprint_matches_frozen_experiment() -> None:
+    """生产提示一旦意外改字，锁定实验的可复现指纹就必须立即报警。"""
+
+    # hashlib属于Python标准库，这里只对公开提示做指纹，不涉及API Key。
+    import hashlib
+
+    # 使用与实验脚本完全相同的UTF-8编码和SHA-256算法。
+    prompt_hash = hashlib.sha256(CLASSIFIER_SYSTEM_PROMPT.encode("utf-8")).hexdigest()
+
+    # 该指纹对应通过32条开发题和16条一次性锁定题的生产提示。
+    assert prompt_hash == "ec3523ede957c5718139be06989a6ce41902eef6aaf1085e4ae537dfb2e51328"

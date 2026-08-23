@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     # 模型请求出现暂时性失败时的最大重试次数；过多重试会放大延迟和费用。
     llm_max_retries: int = Field(default=2, ge=0, le=5)
     # 模型置信度低于该阈值时强制转人工，防止低把握分类进入自动处理路径。
-    intent_confidence_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
+    intent_confidence_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
 
     # 工具规划后端：deterministic 支持零费用回归；llm 使用真实模型逐步选择动作。
     agent_planner_backend: Literal["deterministic", "llm"] = "deterministic"

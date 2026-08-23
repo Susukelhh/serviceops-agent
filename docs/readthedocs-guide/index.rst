@@ -18,8 +18,8 @@ ServiceOps Agent：从代码到面试
 .. warning:: 最新质量结论
 
    第31步四路对照证明RRF改善当前小语料的证据排序，但一次性锁定集因两条新域外表达误召回而
-   ``Gate FAIL``。开发优胜权重1.50没有晋级生产，项目也不宣称Recall已经提升。请先阅读
-   “第31步实验：为什么RRF没有直接晋级”，再使用这组指标写简历。
+   ``Gate FAIL``。项目随后把Bad Case转入第32步意图专项：千问v2冻结候选通过32条开发题与16条
+   一次性锁定题并晋级；RRF的1.50权重仍未晋级，项目也不宣称Recall已经提升。
 
 .. tip::
 
@@ -55,6 +55,7 @@ ServiceOps Agent：从代码到面试
    05_technology_choices
    06_limits_and_next_steps
    09_hybrid_experiment_result
+   10_intent_classification_result
    07_code_reading_route
    08_glossary
 
