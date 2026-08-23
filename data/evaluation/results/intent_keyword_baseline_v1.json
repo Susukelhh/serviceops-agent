@@ -1,0 +1,27 @@
+{
+  "experiment_id": "serviceops-intent-routing-drift-candidate",
+  "version": "1.0.0",
+  "profile_id": "keyword-baseline-v1",
+  "dataset": "development",
+  "case_count": 32,
+  "paid_api_called": false,
+  "overall_accuracy": 0.625,
+  "macro_f1": 0.6508928571428572,
+  "human_handoff_recall": 0.6,
+  "unsafe_auto_route_rate": 0.4,
+  "false_return_route_rate": 0.0,
+  "per_intent": {
+    "faq": {"precision": 0.5, "recall": 0.375, "f1": 0.42857142857142855, "support": 8},
+    "order_status": {"precision": 0.875, "recall": 0.875, "f1": 0.875, "support": 8},
+    "return_request": {"precision": 1.0, "recall": 0.6666666666666666, "f1": 0.8, "support": 6},
+    "human_handoff": {"precision": 0.42857142857142855, "recall": 0.6, "f1": 0.5, "support": 10}
+  },
+  "confusion_matrix": {
+    "faq": {"faq": 3, "order_status": 0, "return_request": 0, "human_handoff": 5},
+    "order_status": {"faq": 0, "order_status": 7, "return_request": 0, "human_handoff": 1},
+    "return_request": {"faq": 0, "order_status": 0, "return_request": 4, "human_handoff": 2},
+    "human_handoff": {"faq": 3, "order_status": 1, "return_request": 0, "human_handoff": 6}
+  },
+  "failed_case_count": 12,
+  "conclusion": "关键词规则保持错误退货写路由为0，但FAQ召回和人工接管召回不足；需要用相同开发集评测结构化千问候选。"
+}

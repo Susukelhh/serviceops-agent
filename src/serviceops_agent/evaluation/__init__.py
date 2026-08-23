@@ -38,6 +38,20 @@ from serviceops_agent.evaluation.grounding_sufficiency_experiment import (
     load_grounding_sufficiency_experiment_config,
     run_grounding_sufficiency_experiment,
 )
+from serviceops_agent.evaluation.intent_classification_experiment import (
+    IntentCaseResult,
+    IntentClassificationExperimentConfig,
+    IntentClassificationExperimentReport,
+    IntentEvaluationCase,
+    IntentProfileResult,
+    IntentQualityGate,
+    evaluate_intent_predictions,
+    evaluate_keyword_intent_baseline,
+    intent_classifier_prompt_sha256,
+    load_intent_evaluation_cases,
+    load_intent_experiment_config,
+    run_intent_classification_experiment,
+)
 from serviceops_agent.evaluation.rag_end_to_end_experiment import (
     RAGEndToEndCase,
     RAGEndToEndCaseResult,
@@ -128,6 +142,12 @@ __all__ = [
     "GroundingQualityGate",
     "GroundingSufficiencyExperimentConfig",
     "GroundingSufficiencyExperimentReport",
+    "IntentCaseResult",
+    "IntentClassificationExperimentConfig",
+    "IntentClassificationExperimentReport",
+    "IntentEvaluationCase",
+    "IntentProfileResult",
+    "IntentQualityGate",
     # 真实千问聊天 + 确定性检索的稳定 profile 名称。
     "QWEN_CANDIDATE_PROFILE",
     # 单条人工标注评测样本。
@@ -177,6 +197,8 @@ __all__ = [
     # 运行完整 LangGraph 并计算端到端指标。
     "evaluate_agent_dataset",
     "evaluate_grounding_client",
+    "evaluate_intent_predictions",
+    "evaluate_keyword_intent_baseline",
     # 按黄金参考路径估算候选聊天模型调用量。
     "estimate_planned_qwen_chat_calls",
     # 执行整个 RAG 检索数据集的评测函数。
@@ -188,6 +210,8 @@ __all__ = [
     "load_candidate_experiment_config",
     "load_grounding_evaluation_cases",
     "load_grounding_sufficiency_experiment_config",
+    "load_intent_evaluation_cases",
+    "load_intent_experiment_config",
     # 从受版本控制 JSON 加载评测集。
     "load_rag_evaluation_cases",
     "load_rag_end_to_end_cases",
@@ -203,6 +227,7 @@ __all__ = [
     # 运行基线和真实候选多轮实验。
     "run_candidate_experiment",
     "run_grounding_sufficiency_experiment",
+    "run_intent_classification_experiment",
     # 运行第24步零费用困难Baseline。
     "run_rag_problem_baseline",
     "run_rag_hybrid_experiment",
@@ -213,5 +238,6 @@ __all__ = [
     # 从既有单轮结果聚合稳定性和晋级结论。
     "summarize_candidate_experiment",
     "grounding_prompt_sha256",
+    "intent_classifier_prompt_sha256",
     "rag_end_to_end_candidate_fingerprint",
 ]

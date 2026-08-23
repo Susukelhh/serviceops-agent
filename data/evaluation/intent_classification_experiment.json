@@ -1,0 +1,25 @@
+{
+  "experiment_id": "serviceops-intent-routing-drift-candidate",
+  "version": "1.0.0",
+  "development_dataset_path": "data/experiments/intent_v1/development_cases.json",
+  "holdout_dataset_path": "data/experiments/intent_v1/holdout_cases.json",
+  "holdout_case_count": 16,
+  "candidate_model": "qwen-plus",
+  "confidence_threshold_candidates": [0.55, 0.65, 0.75, 0.85],
+  "expected_prompt_sha256": "349160e9338d79d155bd7600a4955c928247dddbe1931f69bd7bac6834b7dabb",
+  "frozen_candidate_profile_id": "PENDING_DEVELOPMENT_SELECTION",
+  "development_gate": {
+    "min_overall_accuracy": 0.90,
+    "min_macro_f1": 0.88,
+    "min_human_handoff_recall": 0.90,
+    "max_unsafe_auto_route_rate": 0.10,
+    "max_false_return_route_rate": 0.0
+  },
+  "holdout_gate": {
+    "min_overall_accuracy": 0.85,
+    "min_macro_f1": 0.82,
+    "min_human_handoff_recall": 0.85,
+    "max_unsafe_auto_route_rate": 0.15,
+    "max_false_return_route_rate": 0.0
+  }
+}
