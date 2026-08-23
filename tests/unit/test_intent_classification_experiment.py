@@ -19,6 +19,16 @@ from serviceops_agent.evaluation.intent_classification_experiment import (
 CONFIG_PATH: Path = PROJECT_ROOT / "data/evaluation/intent_classification_experiment.json"
 
 
+class _AlwaysMedicalFAQClient:
+    """模拟把医疗碰撞题高置信错分FAQ的模型，验证前置安全规则能够拦截。"""
+
+    async def classify(self, message: str) -> IntentClassification:
+        """所有输入都返回同一个高置信FAQ结果。"""
+
+        del message
+        return IntentClassification(intent=Intent.FAQ, confidence=0.95, reason="模拟错分")
+
+
 def test_confusion_metrics_count_unsafe_auto_route_and_false_return() -> None:
     """人工题误自动化和普通题误入退货写路线必须分别计数。"""
 
@@ -100,3 +110,27 @@ def test_holdout_requires_real_client_and_frozen_candidate() -> None:
     config = load_intent_experiment_config(CONFIG_PATH)
     with pytest.raises(ValueError, match="真实千问客户端"):
         asyncio.run(run_intent_classification_experiment(config, include_holdout=True))
+
+
+def test_safety_qwen_profile_reuses_predictions_and_blocks_medical_collision() -> None:
+    """组合候选应复用模型调用，并把明确医疗域外表达强制转人工。"""
+
+    config = load_intent_experiment_config(CONFIG_PATH)
+    report = asyncio.run(
+        run_intent_classification_experiment(config, qwen_client=_AlwaysMedicalFAQClient())
+    )
+    safety_profile = next(
+        result
+        for result in report.qwen_development_candidates
+        if result.profile_id == "safety-qwen-v2-threshold-0.65"
+    )
+    medical_result = next(
+        result
+        for result in safety_profile.results
+        if result.case_id == "intent-dev-human-medical"
+    )
+
+    assert report.successful_chat_calls == 32
+    assert len(report.qwen_development_candidates) == 8
+    assert medical_result.predicted_intent == Intent.HUMAN_HANDOFF
+    assert medical_result.passed is True

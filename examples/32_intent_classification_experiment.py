@@ -9,6 +9,7 @@ from pathlib import Path
 from serviceops_agent.config.paths import PROJECT_ROOT
 from serviceops_agent.config.settings import Settings
 from serviceops_agent.evaluation.intent_classification_experiment import (
+    INTENT_CLASSIFIER_PROMPT_V2_CANDIDATE,
     IntentProfileResult,
     load_intent_experiment_config,
     run_intent_classification_experiment,
@@ -71,7 +72,11 @@ async def _run() -> int:
             llm_model=config.candidate_model,
         )
         # create_chat_model 复用项目现有千问OpenAI兼容配置、超时和重试。
-        qwen_client = LangChainIntentClassificationClient(create_chat_model(settings))
+        qwen_client = LangChainIntentClassificationClient(
+            create_chat_model(settings),
+            # v2只在本实验客户端中使用，尚未替换生产默认提示。
+            system_prompt=INTENT_CLASSIFIER_PROMPT_V2_CANDIDATE,
+        )
     report = await run_intent_classification_experiment(
         config,
         qwen_client=qwen_client,

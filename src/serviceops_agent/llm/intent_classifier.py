@@ -67,8 +67,13 @@ class IntentClassificationClient(Protocol):
 class LangChainIntentClassificationClient:
     """使用 LangChain `with_structured_output` 实现的真实模型客户端。"""
 
-    def __init__(self, model: BaseChatModel) -> None:
-        """把普通聊天模型绑定为只返回 IntentClassification 的 Runnable。"""
+    def __init__(
+        self,
+        model: BaseChatModel,
+        *,
+        system_prompt: str = CLASSIFIER_SYSTEM_PROMPT,
+    ) -> None:
+        """把普通聊天模型绑定为结构化输出，并允许实验注入未晋级提示。"""
 
         # function_calling 通过工具 Schema 约束输出，兼容多数支持工具调用的现代模型。
         structured_model = model.with_structured_output(
@@ -79,6 +84,8 @@ class LangChainIntentClassificationClient:
         )
         # BaseChatModel 的通用类型无法推断具体 Pydantic 返回值，这里收窄为已绑定 Schema。
         self._structured_model = cast(Runnable[Any, IntentClassification], structured_model)
+        # 默认仍使用生产v1；候选实验可以显式传入v2而不提前修改线上提示。
+        self._system_prompt = system_prompt
 
     async def classify(self, message: str) -> IntentClassification:
         """调用真实模型，并返回经过 Pydantic 校验的结构化分类。"""
@@ -86,7 +93,7 @@ class LangChainIntentClassificationClient:
         # 系统规则与不可信用户文本使用不同消息角色，降低提示注入覆盖规则的风险。
         messages = [
             # SystemMessage 告诉模型唯一任务和允许输出的标签集合。
-            SystemMessage(content=CLASSIFIER_SYSTEM_PROMPT),
+            SystemMessage(content=self._system_prompt),
             # HumanMessage 只承载待分类文本，不拼进系统提示词模板。
             HumanMessage(content=message),
         ]

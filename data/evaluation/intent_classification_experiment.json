@@ -1,12 +1,12 @@
 {
   "experiment_id": "serviceops-intent-routing-drift-candidate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "development_dataset_path": "data/experiments/intent_v1/development_cases.json",
   "holdout_dataset_path": "data/experiments/intent_v1/holdout_cases.json",
   "holdout_case_count": 16,
   "candidate_model": "qwen-plus",
   "confidence_threshold_candidates": [0.55, 0.65, 0.75, 0.85],
-  "expected_prompt_sha256": "349160e9338d79d155bd7600a4955c928247dddbe1931f69bd7bac6834b7dabb",
+  "expected_prompt_sha256": "ec3523ede957c5718139be06989a6ce41902eef6aaf1085e4ae537dfb2e51328",
   "frozen_candidate_profile_id": "PENDING_DEVELOPMENT_SELECTION",
   "development_gate": {
     "min_overall_accuracy": 0.90,

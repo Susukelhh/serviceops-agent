@@ -1,0 +1,30 @@
+{
+  "experiment_id": "serviceops-intent-routing-drift-candidate",
+  "version": "1.0.0",
+  "candidate": "qwen-plus-production-prompt-v1",
+  "development_case_count": 32,
+  "successful_chat_calls": 32,
+  "thresholds_tested": [0.55, 0.65, 0.75, 0.85],
+  "threshold_results_identical": true,
+  "metrics": {
+    "overall_accuracy": 0.875,
+    "macro_f1": 0.8875,
+    "human_handoff_recall": 0.8,
+    "unsafe_auto_route_rate": 0.2,
+    "false_return_route_rate": 0.0
+  },
+  "failed_case_ids": [
+    "intent-dev-faq-digital-invalid",
+    "intent-dev-faq-signed-missing",
+    "intent-dev-human-medical",
+    "intent-dev-human-code"
+  ],
+  "failed_case_confidences": [0.95, 0.95, 0.95, 0.95],
+  "quality_gate": "FAIL",
+  "quality_gate_failures": [
+    "overall_accuracy_below_threshold",
+    "human_handoff_recall_below_threshold",
+    "unsafe_auto_route_rate_above_threshold"
+  ],
+  "conclusion": "v1提示显著优于关键词基线，但四条高置信错分无法通过调置信度修复；进入v2提示与安全规则前置开发实验，不运行holdout。"
+}

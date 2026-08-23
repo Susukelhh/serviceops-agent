@@ -63,6 +63,19 @@ uv run python examples/32_intent_classification_experiment.py --confirm-paid-api
 如果开发候选通过质量门，先把优胜Profile写入冻结配置，复测确认指纹和名称一致，再决定是否运行一次新
 holdout。未通过以前，不改变生产提示、不改变0.65线上阈值，也不根据新holdout补关键词刷分。
 
+## 千问v1开发结果与第二轮候选
+
+生产v1提示完成32次真实调用。0.55～0.85四档结果完全相同：Accuracy 87.5%、Macro-F1 88.8%、Human
+Recall 80%、Unsafe Auto 20%、False Return 0%，质量门FAIL。四条失败置信度均为0.95，所以继续调阈值
+没有意义。
+
+- 数字权益失效、签收未收到核查规则被过度保守地转人工；
+- 医疗类比、Python代码生成被高置信错分FAQ。
+
+第二轮候选改为实验专用提示v2：明确公开规则与实际订单状态边界，并列出天气、医疗、投资、写作、翻译和
+编程属于人工路径。同时增加“现有确定性高置信安全规则前置 + 千问v2”组合Profile。两组Profile共享同一批
+32次v2原始结果，阈值扫描不重复收费。v2锁定通过前，生产默认提示仍是v1。
+
 ## PyCharm配置
 
 - Script path：`D:\serviceops-agent\examples\32_intent_classification_experiment.py`
