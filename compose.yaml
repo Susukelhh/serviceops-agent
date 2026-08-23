@@ -47,7 +47,7 @@ x-agent-service: &agent-service
   # expose 只把 8000 端口告知 Compose 内部网络，不直接暴露给 Windows。
   expose:
     - "8000"
-  # API 必须等待数据库、独立向量库健康并且 Alembic 迁移成功，才允许启动。
+  # API 必须等待数据库迁移和一次性知识索引都成功，才允许启动。
   depends_on:
     postgres:
       condition: service_healthy
@@ -55,6 +55,8 @@ x-agent-service: &agent-service
       condition: service_completed_successfully
     qdrant:
       condition: service_healthy
+    index-knowledge:
+      condition: service_completed_successfully
   # 只读根文件系统限制运行中的程序修改镜像内容。
   read_only: true
   # 必要的短期临时文件只写到受限内存，不污染镜像层。
@@ -175,6 +177,44 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 0.5
+
+  # index-knowledge 是一次性“资料管理员”：只由一个容器初始化共享 Qdrant 索引。
+  index-knowledge:
+    # 与 Agent 使用同一镜像，保证切片、Embedding和Collection配置完全一致。
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: serviceops-agent:local
+    # 独立入口完成幂等建库和可读性检查，成功后立即退出。
+    command: ["python", "-m", "serviceops_agent.rag.indexer"]
+    # 使用与API相同的固定非root身份运行。
+    user: "10001:10001"
+    environment:
+      <<: *agent-environment
+      # 日志和诊断可以明确区分一次性建索引任务与两只在线Agent。
+      SERVICEOPS_INSTANCE_ID: knowledge-indexer
+    # Qdrant达到健康状态后才能初始化Collection，避免连接重试掩盖真正启动顺序。
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    # 建索引只读取镜像内知识文件并写远端Qdrant，不需要修改本地根文件系统。
+    read_only: true
+    # Python和底层库如需短期临时文件，只允许写入受限内存目录。
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    # init负责转发停止信号并回收异常退出前产生的子进程。
+    init: true
+    # 成功退出是预期状态；失败则由Compose阻止两只Agent继续启动。
+    restart: "no"
+    # 一次性任务同样不保留任何Linux额外权限。
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # 小型种子语料只需要有限资源，防止异常向量化拖慢整机。
     pids_limit: 128
     mem_limit: 512m
     cpus: 0.5

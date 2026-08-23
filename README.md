@@ -96,7 +96,8 @@ SQLite/PostgreSQL 在同一事务内写入退货记录和最小化 Outbox 事件
 新增独立无密钥镜像 CI，会在 Linux 上真实 build/run，并验证非 root、四依赖 ready 与未认证 chat=401。
 真实演练已经完成“写入批准退货 → 修复一次 PostgreSQL 参数类型问题 → Outbox 补偿 → 强制重建 API
 容器 → 恢复原 LangGraph 终态和有效审计哈希链”。业务表结构现由 Alembic 版本脚本管理；Compose
-使用一次性 `migrate` 任务先升级数据库，再启动两个无状态 API。Nginx 是 Windows 唯一入口，默认
+使用一次性 `migrate` 任务先升级数据库，并由单独的 `index-knowledge` 任务初始化共享Qdrant，完成后
+再启动两个无状态 API，避免两个副本同时抢建索引。Nginx 是 Windows 唯一入口，默认
 轮询 `agent-a/agent-b`，两个实例返回低敏实例响应头并共享 PostgreSQL。第十七步自动演练已经证明：
 A 创建的等待审批线程可在 A 停止后由 B 恢复并完成，审计链保持有效；两个独立连接池同时提交相同
 幂等键时恰好一边创建、另一边安全重放。该本机拓扑用于展示多实例关键原理，不冒充云生产平台；
@@ -635,7 +636,7 @@ src/serviceops_agent/
 ├── rag/       # 切片、Embedding、独立 Qdrant、BM25、RRF 和受约束生成
 └── web/       # 随 wheel 发布的 Agent 控制台 HTML/CSS/JavaScript
 Dockerfile     # 多阶段、固定依赖、非 root 单进程运行镜像
-compose.yaml   # Nginx + 双 Agent + 一次性迁移 + PostgreSQL + 独立 Qdrant
+compose.yaml   # Nginx + 双Agent + 一次性迁移/建索引 + PostgreSQL + 独立Qdrant
 deploy/nginx/  # 轮询、Docker DNS 重解析、超时与安全响应头配置
 tests/         # 单元、图/API、SQLite 与真实 PostgreSQL 集成测试
 examples/      # 对照课程学习的最小示例

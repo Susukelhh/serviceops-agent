@@ -91,8 +91,10 @@ def test_container_workflow_builds_and_probes_multi_instance_topology() -> None:
     # 镜像要真实构建，Compose 必须启动完整多实例拓扑而不是退回单容器冒烟。
     assert "docker build --pull" in workflow
     assert "docker compose up --detach --no-build --wait" in workflow
-    # 迁移任务必须成功退出；运行容器仍需验证非 root、只读和零 Capability。
+    # 迁移和知识索引任务必须成功退出；运行容器仍需验证非root、只读和零Capability。
     assert "--status exited --services migrate" in workflow
+    assert "--status exited --services index-knowledge" in workflow
+    assert "PASS: ServiceOps knowledge index is ready" in workflow
     assert "10001:10001" in workflow
     assert "ReadonlyRootfs" in workflow
     assert "CapDrop" in workflow
@@ -115,6 +117,8 @@ def test_container_workflow_builds_and_probes_multi_instance_topology() -> None:
     assert "CHECKPOINT PLAYBACK" in workflow
     assert ".debug-inspector" in workflow
     assert "/api/v1/debug/threads/" in workflow
+    # 失败清理必须包含Qdrant和建索引任务，否则共享索引问题会只剩“Agent unhealthy”。
+    assert "index-knowledge qdrant postgres" in workflow
     # 第20.2步全宽工作台和专注大屏也必须真实进入最终容器资源。
     assert "Agent 执行回放工作台" in workflow
     assert 'id="debug-focus-button"' in workflow

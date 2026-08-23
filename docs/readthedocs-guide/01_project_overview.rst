@@ -96,5 +96,4 @@ ServiceOps Agent 是一个“企业售后接待员”：它接收用户问题，
    * - ``src/serviceops_agent/config/settings.py``
      - 集中管理模型、数据库、RAG、权限和限流配置
    * - ``compose.yaml``
-     - 描述 Nginx、双 Agent、迁移任务和 PostgreSQL 如何一起运行
-
+     - 描述 Nginx、双 Agent、迁移/建索引任务、PostgreSQL和Qdrant如何一起运行

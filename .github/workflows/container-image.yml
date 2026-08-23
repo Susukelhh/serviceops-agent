@@ -42,16 +42,18 @@ jobs:
         run: |
           test "$(docker image inspect --format '{{.Config.User}}' serviceops-agent:local)" = "10001:10001"
 
-      # 使用刚构建的本地镜像启动迁移、双 Agent、Nginx 和临时 PostgreSQL，不调用任何真实模型。
+      # 使用刚构建的本地镜像启动迁移、建索引、双 Agent、Nginx、Qdrant和临时PostgreSQL。
       - name: Start hardened multi-instance topology
         run: docker compose up --detach --no-build --wait --wait-timeout 120
 
-      # 一次性迁移必须正常完成；两个长期 Agent 继续满足非 root、只读与零 Capability。
+      # 两个一次性任务必须成功；两个长期 Agent 继续满足非 root、只读与零 Capability。
       - name: Verify migration and runtime hardening
         shell: bash
         run: |
           test "$(docker compose ps -a --status exited --services migrate)" = "migrate"
           docker compose logs migrate | grep -F "PASS: ServiceOps"
+          test "$(docker compose ps -a --status exited --services index-knowledge)" = "index-knowledge"
+          docker compose logs index-knowledge | grep -F "PASS: ServiceOps knowledge index is ready"
           agent_a_id="$(docker compose ps -q agent-a)"
           test -n "$agent_a_id"
           test "$(docker inspect --format '{{.Config.User}}' "$agent_a_id")" = "10001:10001"
@@ -166,11 +168,11 @@ jobs:
           assert Path(report["manifest_path"]).is_file()
           PY
 
-      # 失败时输出五个角色日志；Runner 上的数据库卷只含本次临时数据，可以在 finally 中删除。
+      # 失败时输出全部七个容器日志；Runner 上的卷只含本次临时数据，可以在finally中删除。
       - name: Show logs and remove test resources
         if: ${{ always() }}
         shell: bash
         run: |
           docker compose ps -a 2>&1 || true
-          docker compose logs --tail 200 gateway agent-a agent-b migrate postgres 2>&1 || true
+          docker compose logs --tail 200 gateway agent-a agent-b migrate index-knowledge qdrant postgres 2>&1 || true
           docker compose down --volumes --remove-orphans 2>/dev/null || true

@@ -99,9 +99,11 @@ def test_compose_applies_local_only_and_least_privilege_boundaries() -> None:
     assert "serviceops-postgres:/var/lib/postgresql" in compose
     assert "SERVICEOPS_PERSISTENCE_BACKEND: postgres" in compose
     assert "condition: service_healthy" in compose
-    # API 必须等待一次性 Alembic 迁移成功，不能在每个进程启动时自行建业务表。
+    # API 必须等待一次性Alembic迁移和共享知识建索引成功，避免副本并发初始化。
     assert "condition: service_completed_successfully" in compose
     assert 'command: ["python", "-m", "serviceops_agent.infrastructure.migrate"]' in compose
+    assert 'command: ["python", "-m", "serviceops_agent.rag.indexer"]' in compose
+    assert "index-knowledge:" in compose
     # 数据库镜像同时固定补丁标签和内容摘要，避免同名标签被重新发布后静默变化。
     assert "postgres:18.4-bookworm@sha256:" in compose
     # 统一入口也固定 Nginx 补丁版本与镜像摘要。

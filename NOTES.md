@@ -251,3 +251,9 @@
 - 默认mock/CI仍使用关键词规则，模型故障、低于0.85、Schema异常继续安全转人工。
 - 100%只代表32条开发和16条一次性锁定题，不外推线上全量准确率。
 - 生产提示、默认0.85阈值和实验提示已合并为同一来源，并用SHA-256指纹测试防止未评测改字；最终门禁为Ruff PASS、Mypy 87个源码文件 PASS、Pytest 202 passed/2 skipped、离线Agent Eval 13/13、Sphinx严格构建PASS、发布审计READY。
+
+## 2026-08-23：公开CI与双Agent索引启动竞争修复
+
+- GitHub干净检出不包含被忽略的`career/resume`，私人材料检查改为仅在文件存在的本机执行；公开CI缺失时明确skip，不上传简历。
+- 容器门暴露agent-a不健康而agent-b正常；把共享Qdrant初始建库从两个API副本启动期竞争，改为一次性`index-knowledge`任务串行完成。
+- 两只Agent必须等待迁移和知识索引任务都成功退出；失败日志新增index-knowledge与Qdrant，后续不再只看到笼统的unhealthy。

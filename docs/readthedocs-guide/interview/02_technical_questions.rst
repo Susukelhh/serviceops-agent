@@ -67,7 +67,7 @@ RAG
 
 14. **为什么选择 Qdrant？**
 
-    回答：客户端既支持单测内存模式，也支持独立服务；Compose 中两只 Agent 共用持久化 Collection，``/ready`` 会真实探测它。没有做 Milvus/pgvector 基准，因此不声称它对所有规模都最优。
+    回答：客户端既支持单测内存模式，也支持独立服务；Compose中两只Agent共用持久化Collection，一次性 ``index-knowledge`` 任务先串行建库，``/ready`` 再真实探测它。没有做Milvus/pgvector基准，因此不声称它对所有规模都最优。
 
 15. **BM25 是混合检索吗？**
 

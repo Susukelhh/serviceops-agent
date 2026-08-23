@@ -26,9 +26,13 @@ Compose 中有哪些服务
      PostgreSQL   Qdrant
 
    migrate：数据库启动后先升级表结构，成功退出
+   index-knowledge：Qdrant健康后只初始化一次共享索引，成功退出
 
 只有 Nginx 的 8000 端口暴露给 Windows。两只 Agent、PostgreSQL 和 Qdrant 只在 Docker 私有网络通信；
 宿主机既不能直连 5432，也不能绕过 Agent 直连 6333。PostgreSQL 保存业务事实和工作流，Qdrant 只保存知识向量与切片 Payload。
+
+两只Agent不再同时负责首次建索引。``index-knowledge`` 像开门前整理资料柜的一名工作人员：它先完成Collection
+创建、切片写入和可读性检查，两只Agent确认该任务成功后才启动。这样既保留幂等补齐，也消除了多个副本同时抢建共享索引的启动竞争。
 
 为什么需要两个 Agent
 ====================================================================================================

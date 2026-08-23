@@ -3,6 +3,9 @@
 # Path 用于把项目相对路径标注为明确的文件路径类型。
 from pathlib import Path
 
+# pytest 允许公开 CI 在没有私人简历时只跳过对应材料测试。
+import pytest
+
 # resolve_project_path 保证从 PyCharm、命令行或 CI 启动时都能找到项目文件。
 from serviceops_agent.config.paths import resolve_project_path
 
@@ -12,6 +15,10 @@ def _read_required_material(relative_path: str) -> str:
 
     # 将仓库内的相对路径转换成不依赖当前工作目录的绝对路径。
     material_path: Path = resolve_project_path(relative_path)
+    # career/resume 受 .gitignore 保护，GitHub 干净检出中按设计不存在。
+    if relative_path.startswith("career/resume/") and not material_path.is_file():
+        # 只跳过依赖私人材料的测试；生产代码、公开文档和其他质量门继续完整执行。
+        pytest.skip("私人简历目录未进入公开仓库，跳过仅适用于本机的材料一致性检查")
     # 求职交付必须真实落在仓库中，不能只存在于对话消息里。
     assert material_path.is_file()
     # 所有中文 Markdown 文档都统一使用 UTF-8，避免 Windows 默认编码造成乱码。
@@ -60,8 +67,8 @@ def test_resume_metrics_match_versioned_project_evidence() -> None:
     assert "每轮 13/13" in resume
     assert "小型黄金集" in resume
     # 当前完整门禁数字可以写，但必须明确它是本地测试结果。
-    # 第32步加入意图专项与晋级保护后，总数更新为202。
-    assert "当前本地测试为 202 passed、2 skipped" in resume
+    # 加入一次性知识索引任务契约后，本地完整测试总数更新为203。
+    assert "当前本地测试为 203 passed、2 skipped" in resume
     # 证据地图必须明确禁止把小样本结果外推为永久或线上 100%。
     assert "不能说“Agent 准确率永久 100%”" in evidence
     assert "不外推线上准确率" in evidence
