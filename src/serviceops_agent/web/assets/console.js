@@ -385,6 +385,7 @@ const readinessLabels = {
   return_repository: "退货业务库",
   outbox_repository: "事务 Outbox",
   audit_repository: "审批审计库",
+  knowledge_qdrant: "Qdrant 知识索引",
 };
 
 // renderSystemStatus 重建侧栏状态列表。
@@ -398,7 +399,7 @@ const renderSystemStatus = (health, readiness) => {
     createElement("span", "status-dot"),
   );
   elements.systemStatusList.append(apiRow);
-  // 按前端固定顺序展示四项依赖，未知字段不会进入页面。
+  // 按前端固定顺序展示五项依赖，未知字段不会进入页面。
   Object.entries(readinessLabels).forEach(([key, label]) => {
     // 后端缺少字段时保守视为 not_ready。
     const ready = readiness.checks?.[key]?.status === "ready";
@@ -429,7 +430,7 @@ const refreshHealth = async () => {
     elements.environmentLabel.textContent = `${health.environment} · ${readiness.persistence_backend}`;
     // 清除离线红点。
     elements.environmentChip.classList.remove("offline");
-    // 重建四依赖状态。
+    // 重建五依赖状态。
     renderSystemStatus(health, readiness);
   } catch (error) {
     // 连接失败时不伪造具体依赖状态。

@@ -108,6 +108,8 @@ async def test_console_static_assets_are_served_with_expected_types() -> None:
     assert "/api/v1/audit/approvals/" in js_response.text
     assert "/api/v1/debug/threads/" in js_response.text
     assert "renderSelectedCheckpoint" in js_response.text
+    # 控制台必须展示新增的第五项Qdrant就绪状态，不能只在后端响应中存在。
+    assert 'knowledge_qdrant: "Qdrant 知识索引"' in js_response.text
     # 大屏模式必须同时存在完整布局样式和由单一函数维护的交互状态。
     assert ".debug-stage" in css_response.text
     assert "body.debug-focus-mode" in css_response.text

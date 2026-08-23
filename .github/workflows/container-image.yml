@@ -60,7 +60,7 @@ jobs:
           test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$agent_a_id")" = "true"
           test "$(docker inspect --format '{{json .HostConfig.CapDrop}}' "$agent_a_id")" = '["ALL"]'
 
-      # 连续请求必须经过 Nginx 并真实观察到两个实例；readiness 仍需四项依赖全部可读。
+      # 连续请求必须经过Nginx并观察到两个实例；readiness需四类状态存储和Qdrant全部可读。
       - name: Verify gateway round robin and readiness
         shell: bash
         run: |
@@ -83,7 +83,13 @@ jobs:
               payload = json.loads(response.read().decode("utf-8"))
           assert payload["status"] == "ready"
           assert payload["persistence_backend"] == "postgres"
-          assert len(payload["checks"]) == 4
+          assert set(payload["checks"]) == {
+              "checkpointer",
+              "return_repository",
+              "outbox_repository",
+              "audit_repository",
+              "knowledge_qdrant",
+          }
           assert all(item["status"] == "ready" for item in payload["checks"].values())
           PY
 

@@ -104,6 +104,7 @@ def test_container_workflow_builds_and_probes_multi_instance_topology() -> None:
     # 平台必须等待真实 readiness，并验证业务接口未认证时返回 401。
     assert "http://127.0.0.1:8000/ready" in workflow
     assert 'payload["persistence_backend"] == "postgres"' in workflow
+    assert '"knowledge_qdrant"' in workflow
     assert 'test "$status" = "401"' in workflow
     # 产品控制台必须随 wheel 进入镜像，并验证 HTML、安全 Header 与同源静态资源。
     assert "Verify packaged Agent console" in workflow

@@ -257,3 +257,4 @@
 - GitHub干净检出不包含被忽略的`career/resume`，私人材料检查改为仅在文件存在的本机执行；公开CI缺失时明确skip，不上传简历。
 - 容器门暴露agent-a不健康而agent-b正常；把共享Qdrant初始建库从两个API副本启动期竞争，改为一次性`index-knowledge`任务串行完成。
 - 两只Agent必须等待迁移和知识索引任务都成功退出；失败日志新增index-knowledge与Qdrant，后续不再只看到笼统的unhealthy。
+- 首次云端复测已证明启动竞争修复有效；随后发现容器CI仍用旧的readiness 4项断言，已改为逐名验证四类状态存储和Qdrant共5项依赖。

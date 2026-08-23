@@ -93,7 +93,7 @@ SQLite/PostgreSQL 在同一事务内写入退货记录和最小化 Outbox 事件
 地址，根文件系统只读，删除全部 Linux Capability并禁止提权。PostgreSQL 作为独立容器运行，5432
 不映射到 Windows；只有数据库目录进入具名卷，API 容器本身无状态。
 镜像和 Compose 都使用真实 `/ready` 探针，只有 Checkpointer、业务库、Outbox 和审计库全部可读才接流量。
-新增独立无密钥镜像 CI，会在 Linux 上真实 build/run，并验证非 root、四依赖 ready 与未认证 chat=401。
+新增独立无密钥镜像 CI，会在 Linux 上真实 build/run，并验证非root、五项依赖ready与未认证chat=401。
 真实演练已经完成“写入批准退货 → 修复一次 PostgreSQL 参数类型问题 → Outbox 补偿 → 强制重建 API
 容器 → 恢复原 LangGraph 终态和有效审计哈希链”。业务表结构现由 Alembic 版本脚本管理；Compose
 使用一次性 `migrate` 任务先升级数据库，并由单独的 `index-knowledge` 任务初始化共享Qdrant，完成后
@@ -415,7 +415,7 @@ uv run python examples/14_qwen_candidate_experiment.py --confirm-paid-api --tria
 确认额度和输出正常后，再去掉 `--trials 1`，按版本化配置运行默认三轮。当前黄金参考路径估算约
 24 次聊天请求/轮；服务商重试或模型错误路由可能改变实际数量。
 
-安装 Docker Desktop 后，构建并启动“网关 + 两只 Agent + 迁移任务 + PostgreSQL”：
+安装Docker Desktop后，构建并启动“网关 + 两只Agent + 迁移/建索引任务 + PostgreSQL + Qdrant”：
 
 ```powershell
 docker compose config
@@ -423,7 +423,7 @@ docker compose up --build --detach --wait --wait-timeout 120
 uv run python examples/15_container_smoke_test.py
 ```
 
-预期输出 `PASS: liveness=ok, readiness=ready(4/4), unauthenticated_chat=401`，且 `/ready` 中的
+预期输出 `PASS: liveness=ok, readiness=ready(5/5), unauthenticated_chat=401`，且 `/ready` 中的
 `persistence_backend` 应为 `postgres`。停止容器并保留 PostgreSQL 具名卷使用 `docker compose down`；
 不要在仍需审批/审计演示数据时增加 `--volumes`。
 
