@@ -336,6 +336,18 @@ uv run python examples/30_release_readiness_audit.py --run-quality-gates
 个人信息仍为占位符。脚本不会执行远程推送或填写个人身份。完整说明见
 [`docs/steps/30-release-readiness-and-public-safety.md`](docs/steps/30-release-readiness-and-public-safety.md)。
 
+运行第31步独立Qdrant与完整混合召回对照。默认只跑74条已揭晓开发回归题，不调用付费API：
+
+```powershell
+uv run python examples/31_hybrid_retrieval_experiment.py
+```
+
+四路对照中，冻结RRF把开发Top-1从纯向量83.87%提高到93.55%，比旧候选内重排91.94%再提高
+1.61个百分点；Recall@5仍为100%、关键词救回数为0，因此只证明排序改善。冻结后16条新锁定题的
+知识内Recall@5为100%、Top-1为91.67%，但两条新域外表达被范围门放行，FPR 50%、Gate FAIL。
+开发优胜的关键词权重1.50没有晋级生产，下一步以这两个Bad Case驱动意图分类实验。详见
+[`docs/steps/31-independent-qdrant-hybrid-retrieval-experiment.md`](docs/steps/31-independent-qdrant-hybrid-retrieval-experiment.md)。
+
 运行两个订单的可控工具循环与最大步数安全停止演示：
 
 ```powershell

@@ -62,6 +62,10 @@ RAG 为什么分开发集和锁定集
      - 单模块通过不代表组合通过
      - 串联范围门、语义召回、重排和 Grounded 回答
      - 12 条锁定集通过，仍保留开发 Bad Case
+   * - 31 完整混合召回
+     - 接入全库BM25和RRF不等于质量自动提升
+     - 四路对照、参数扫描、逐题排名变化和新锁定集
+     - 开发Top-1改善；锁定FPR 50%，候选拒绝晋级
 
 指标的大白话解释
 ====================================================================================================
@@ -78,7 +82,7 @@ RAG 为什么分开发集和锁定集
 
 * Ruff 检查常见代码问题和导入规则；
 * Mypy 严格检查类型边界；
-* Pytest 当前为 187 passed、2 skipped；
+* Pytest 会覆盖四路检索装配、参数选择和holdout默认隔离；
 * GitHub Actions 在 Linux 上重跑离线门禁和 13 条 Agent 评测；
 * 真实千问实验必须手工确认，不在普通 PR 中消耗费用。
 
@@ -89,5 +93,4 @@ RAG 为什么分开发集和锁定集
 * ``data/evaluation/``
 * ``data/experiments/``
 * ``examples/13_agent_end_to_end_evaluation.py``
-* ``examples/24_rag_problem_baseline.py`` 至 ``examples/29_rag_end_to_end_experiment.py``
-
+* ``examples/24_rag_problem_baseline.py`` 至 ``examples/31_hybrid_retrieval_experiment.py``

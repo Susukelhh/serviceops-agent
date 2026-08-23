@@ -1,0 +1,54 @@
+{
+  "experiment_id": "serviceops-independent-qdrant-hybrid-retrieval",
+  "version": "1.0.0",
+  "frozen_profile_id": "hybrid-rrf-k60-lex1.50",
+  "paid_api_called": false,
+  "development": {
+    "case_count": 74,
+    "dense_only": {
+      "recall_at_5": 1.0,
+      "top_1_accuracy": 0.8387096774193549,
+      "mrr_at_5": 0.9118279569892472,
+      "false_positive_rate": 0.0
+    },
+    "legacy_candidate_bm25": {
+      "recall_at_5": 1.0,
+      "top_1_accuracy": 0.9193548387096774,
+      "mrr_at_5": 0.9596774193548387,
+      "false_positive_rate": 0.0
+    },
+    "frozen_hybrid_rrf": {
+      "recall_at_5": 1.0,
+      "top_1_accuracy": 0.9354838709677419,
+      "mrr_at_5": 0.967741935483871,
+      "false_positive_rate": 0.0,
+      "ranking_lift_cases": 7,
+      "ranking_regression_cases": 1,
+      "lexical_rescue_cases": 0,
+      "quality_gate": "PASS"
+    }
+  },
+  "holdout": {
+    "case_count": 16,
+    "positive_cases": 12,
+    "negative_cases": 4,
+    "frozen_hybrid_rrf": {
+      "recall_at_5": 1.0,
+      "top_1_accuracy": 0.9166666666666666,
+      "mrr_at_5": 0.9583333333333334,
+      "false_positive_rate": 0.5,
+      "ranking_lift_cases": 1,
+      "ranking_regression_cases": 0,
+      "failed_case_ids": [
+        "hybrid-holdout-negative-weather",
+        "hybrid-holdout-negative-writing"
+      ],
+      "quality_gate": "FAIL",
+      "quality_gate_failures": [
+        "false_positive_rate_above_threshold"
+      ]
+    }
+  },
+  "promotion_decision": "REJECTED",
+  "conclusion": "RRF改善当前小语料的证据排序，但没有证明Recall提升；冻结候选因新域外表达误召回而未晋级，生产权重保持原值。"
+}

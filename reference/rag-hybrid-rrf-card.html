@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RRF混合召回实验卡</title>
+  <style>:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#17232d;--muted:#60717d;--line:#dce5ea;--green:#17724c;--red:#a43d32}*{box-sizing:border-box}body{margin:0;background:#edf3f6;color:var(--ink)}main{width:min(1040px,calc(100% - 28px));margin:24px auto;background:white;padding:36px;border-radius:20px;box-shadow:0 15px 42px rgba(22,44,62,.09)}h1{margin:0;font:700 38px Georgia,"Songti SC",serif}.lead{color:var(--muted);font-size:18px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{border:1px solid var(--line);border-radius:14px;padding:18px}.num{font-size:30px;font-weight:800}.good{color:var(--green)}.bad{color:var(--red)}.answer{margin-top:22px;padding:20px;border-left:5px solid #315fc3;background:#f1f5ff;border-radius:10px}code{background:#e9eef2;padding:2px 5px;border-radius:5px}@media(max-width:760px){.grid{grid-template-columns:1fr}}</style>
+</head>
+<body><main>
+  <h1>RRF混合召回实验卡</h1>
+  <p class="lead">问题 → 对照 → 指标 → Bad Case → 决策，而不是罗列技术名词</p>
+  <div class="grid">
+    <section class="card"><b>开发Top-1</b><div class="num good">83.87% → 93.55%</div><p>74条题，纯向量对比冻结RRF。</p></section>
+    <section class="card"><b>Recall / 关键词救回</b><div class="num">100% / 0条</div><p>收益是排序改善，不能写召回提升。</p></section>
+    <section class="card"><b>锁定FPR</b><div class="num bad">50%</div><p>2/4条域外表达误放行，Gate FAIL。</p></section>
+  </div>
+  <section class="answer"><b>30秒面试回答</b><p>我先实现两路独立全库召回，再用四路同变量实验判断是否值得上线。RRF开发Top-1比纯向量提高9.68个百分点，但Recall没有变化；冻结后新锁定集暴露意图范围漂移，FPR 50%，所以我拒绝晋级1.50权重，并把失败样本转为下一版意图分类开发集。最大的收获不是接入RRF，而是用质量门把“排序改善”和“业务可上线”分开。</p></section>
+  <p>关键配置：<code>dense_k=8</code>、<code>lexical_k=8</code>、<code>rrf_k=60</code>、开发优胜<code>lexical_weight=1.50</code>（未晋级生产）。</p>
+</main></body></html>

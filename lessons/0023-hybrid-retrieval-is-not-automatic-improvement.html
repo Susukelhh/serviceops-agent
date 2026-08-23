@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>混合召回不是自动优化</title>
+  <style>:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#17232d;--muted:#64727c;--red:#a43d32;--green:#17724c;--blue:#315fc3;--line:#dbe4ea}*{box-sizing:border-box}body{margin:0;background:#eef3f6;color:var(--ink)}main{width:min(980px,calc(100% - 28px));margin:28px auto;padding:38px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 15px 45px rgba(25,45,65,.08)}h1{font:700 39px Georgia,"Songti SC",serif;margin:0}.lead{color:var(--muted);font-size:18px}.flow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}.card{padding:20px;border:1px solid var(--line);border-radius:14px}.pass{background:#eff9f4}.fail{background:#fff2f0}.pass b{color:var(--green)}.fail b{color:var(--red)}table{border-collapse:collapse;width:100%}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}.lesson{padding:20px;background:#f2f5ff;border-left:4px solid var(--blue);border-radius:12px}code{background:#e8edf1;padding:2px 5px;border-radius:5px}a{color:#2558ba}@media(max-width:680px){.flow{grid-template-columns:1fr}}</style>
+</head>
+<body><main>
+  <h1>混合召回不是自动优化</h1>
+  <p class="lead">第23课 · 接上技术只是获得能力，质量门才决定能不能上线</p>
+  <div class="flow">
+    <section class="card pass"><b>排序确实改善</b><p>74条开发题中，RRF Top-1 93.55%，纯向量是83.87%，旧候选重排是91.94%。</p></section>
+    <section class="card fail"><b>最终仍拒绝晋级</b><p>16条新锁定题中，两条域外表达被放行，FPR 50%，整体 Gate FAIL。</p></section>
+  </div>
+  <h2>生活类比</h2>
+  <p>两位图书管理员合作后，确实能把更合适的书排到前面；但如果门卫把“问天气”和“写作文”的人也放进售后资料室，管理员仍会努力找出几本相似的书。<strong>排书能力</strong>不能代替<strong>门口分流</strong>。</p>
+  <table><thead><tr><th>指标</th><th>这次结果</th><th>能否宣称</th></tr></thead><tbody>
+    <tr><td>Top-1</td><td>83.87% → 93.55%</td><td>可以说排序改善</td></tr>
+    <tr><td>Recall@5</td><td>100% → 100%</td><td>不能说召回率提升</td></tr>
+    <tr><td>Lexical rescue</td><td>0条</td><td>不能说救回了漏召回</td></tr>
+    <tr><td>Holdout FPR</td><td>50%</td><td>必须说明没有晋级</td></tr>
+  </tbody></table>
+  <section class="lesson"><strong>记住一句话</strong><p>技术栈是解决问题的候选手段，不是简历结论。结论必须来自同变量对照、逐题Bad Case和一次性锁定集。</p></section>
+  <p><a href="../docs/steps/31-independent-qdrant-hybrid-retrieval-experiment.md">查看第31步完整实验</a> · <a href="../reference/rag-hybrid-rrf-card.html">查看RRF实验卡</a></p>
+</main></body></html>

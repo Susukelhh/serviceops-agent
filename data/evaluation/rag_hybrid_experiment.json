@@ -1,0 +1,44 @@
+{
+  "experiment_id": "serviceops-independent-qdrant-hybrid-retrieval",
+  "version": "1.0.0",
+  "corpus_path": "data/experiments/rag_v2/knowledge_documents.json",
+  "development_dataset_paths": [
+    "data/experiments/rag_v2/development_cases.json",
+    "data/experiments/rag_v2/ranking_development_cases.json",
+    "data/experiments/rag_v2/holdout_cases.json",
+    "data/experiments/rag_v2/ranking_holdout_cases.json"
+  ],
+  "holdout_dataset_path": "data/experiments/rag_hybrid/holdout_cases.json",
+  "holdout_case_count": 16,
+  "embedding_dimensions": 1024,
+  "chunk_size": 500,
+  "chunk_overlap": 80,
+  "score_threshold": 0.10,
+  "top_k": 5,
+  "candidate_k": 5,
+  "candidate_bm25_weight": 0.25,
+  "dense_k": 8,
+  "lexical_k": 8,
+  "rrf_k_candidates": [30, 60],
+  "dense_weight": 1.0,
+  "lexical_weight_candidates": [0.40, 0.80, 1.00, 1.20, 1.50, 2.00],
+  "frozen_candidate_profile_id": "hybrid-rrf-k60-lex1.50",
+  "development_gate": {
+    "min_recall_at_k": 1.0,
+    "min_top_1_accuracy": 0.90,
+    "min_mrr_at_k": 0.95,
+    "min_top_1_gain_vs_dense": 0.05,
+    "min_mrr_gain_vs_dense": 0.03,
+    "max_false_positive_rate": 0.0,
+    "max_ranking_regression_cases": 3
+  },
+  "holdout_gate": {
+    "min_recall_at_k": 0.90,
+    "min_top_1_accuracy": 0.85,
+    "min_mrr_at_k": 0.90,
+    "min_top_1_gain_vs_dense": 0.00,
+    "min_mrr_gain_vs_dense": 0.00,
+    "max_false_positive_rate": 0.0,
+    "max_ranking_regression_cases": 2
+  }
+}

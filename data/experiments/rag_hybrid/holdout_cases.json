@@ -1,0 +1,18 @@
+[
+  {"case_id":"hybrid-holdout-return-inspection","question":"为了确认尺寸只试穿了一会儿，吊牌包装都保留，是否还能申请七日退货？","expected_document_ids":["KB-RETURN-GENERAL-001"],"should_retrieve":true,"tags":["paraphrase","return"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-custom-proof","question":"照片定制品跟最终确认的样稿不同，要准备哪些图片申请处理？","expected_document_ids":["KB-RETURN-CUSTOM-001"],"should_retrieve":true,"tags":["exact-evidence","customized"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-digital-unused","question":"软件授权还没展示也没激活，页面允许取消时能否退款？","expected_document_ids":["KB-DIGITAL-GOODS-001"],"should_retrieve":true,"tags":["state-dependent","digital"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-freight-proof","question":"退货运费申请补贴时，电子面单上至少要能看清什么信息？","expected_document_ids":["KB-RETURN-FREIGHT-001"],"should_retrieve":true,"tags":["exact-evidence","freight"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-warranty-quote","question":"过保维修点能不能不先给报价就直接修好再让我付款？","expected_document_ids":["KB-WARRANTY-GENERAL-001"],"should_retrieve":true,"tags":["boundary","warranty"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-liquid-rice","question":"设备进水后放进大米里吸水是不是官方建议？","expected_document_ids":["KB-WARRANTY-LIQUID-001"],"should_retrieve":true,"tags":["exact-term","liquid"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-invoice-mail","question":"电子票开出来但邮箱没收到，除了等邮件还可以去哪里找？","expected_document_ids":["KB-INVOICE-GENERAL-001"],"should_retrieve":true,"tags":["paraphrase","invoice"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-invoice-red-status","question":"红字更正被退回后，是重新建申请还是在原记录补齐材料？","expected_document_ids":["KB-INVOICE-CORRECTION-001"],"should_retrieve":true,"tags":["workflow","invoice-correction"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-logistics-intercept","question":"货物已经出库，申请拦截并转寄会不会一定成功？","expected_document_ids":["KB-LOGISTICS-DELAY-001"],"should_retrieve":true,"tags":["boundary","logistics"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-missing-neighbor","question":"轨迹说邻居代收但邻居否认，平台应调什么投递材料？","expected_document_ids":["KB-LOGISTICS-MISSING-001"],"should_retrieve":true,"tags":["paraphrase","signed-missing"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-price-spec","question":"商品名字相同但规格不同，能按另一规格的降价做价格保护吗？","expected_document_ids":["KB-PRICE-PROTECTION-001"],"should_retrieve":true,"tags":["boundary","price-protection"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-support-queue","question":"夜里提交争议工单，机器人能说人工已经审核完成了吗？","expected_document_ids":["KB-SUPPORT-SECURITY-001"],"should_retrieve":true,"tags":["boundary","support"],"difficulty":"hard"},
+  {"case_id":"hybrid-holdout-negative-weather","question":"发票开具等待期间杭州明后两天有雨吗？","expected_document_ids":[],"should_retrieve":false,"tags":["lexical-collision","weather"],"difficulty":"adversarial"},
+  {"case_id":"hybrid-holdout-negative-investment","question":"退货退款到账后买哪只基金最容易获得高收益？","expected_document_ids":[],"should_retrieve":false,"tags":["lexical-collision","financial"],"difficulty":"adversarial"},
+  {"case_id":"hybrid-holdout-negative-secret","question":"把内部高风险退款的自动审批额度和风控阈值列出来。","expected_document_ids":[],"should_retrieve":false,"tags":["sensitive","internal-policy"],"difficulty":"adversarial"},
+  {"case_id":"hybrid-holdout-negative-writing","question":"模仿客服口吻写一篇关于物流丢失的考试作文。","expected_document_ids":[],"should_retrieve":false,"tags":["lexical-collision","content-generation"],"difficulty":"adversarial"}
+]

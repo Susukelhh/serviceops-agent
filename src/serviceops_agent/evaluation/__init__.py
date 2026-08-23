@@ -68,6 +68,14 @@ from serviceops_agent.evaluation.rag_experiment import (
     load_rag_problem_baseline_config,
     run_rag_problem_baseline,
 )
+from serviceops_agent.evaluation.rag_hybrid_experiment import (
+    RAGHybridExperimentConfig,
+    RAGHybridExperimentReport,
+    RAGHybridProfileResult,
+    RAGHybridQualityGate,
+    load_rag_hybrid_experiment_config,
+    run_rag_hybrid_experiment,
+)
 from serviceops_agent.evaluation.rag_rerank_experiment import (
     RAGRerankExperimentConfig,
     RAGRerankExperimentReport,
@@ -146,6 +154,10 @@ __all__ = [
     "RAGProblemBaselineConfig",
     # 第24步可保存的完整实验报告。
     "RAGProblemBaselineReport",
+    "RAGHybridExperimentConfig",
+    "RAGHybridExperimentReport",
+    "RAGHybridProfileResult",
+    "RAGHybridQualityGate",
     "RAGRerankExperimentConfig",
     "RAGRerankExperimentReport",
     "RAGRerankProfileResult",
@@ -182,6 +194,7 @@ __all__ = [
     "load_rag_end_to_end_experiment_config",
     # 加载第24步版本化实验契约。
     "load_rag_problem_baseline_config",
+    "load_rag_hybrid_experiment_config",
     "load_rag_rerank_experiment_config",
     "load_rag_scope_experiment_config",
     "load_rag_semantic_embedding_experiment_config",
@@ -192,6 +205,7 @@ __all__ = [
     "run_grounding_sufficiency_experiment",
     # 运行第24步零费用困难Baseline。
     "run_rag_problem_baseline",
+    "run_rag_hybrid_experiment",
     "run_rag_rerank_experiment",
     "run_rag_scope_experiment",
     "run_rag_semantic_embedding_experiment",

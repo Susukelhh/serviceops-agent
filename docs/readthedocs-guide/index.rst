@@ -15,6 +15,12 @@ ServiceOps Agent：从代码到面试
    FAQ 不再是“向量先选、BM25 只复查”，而是 Qdrant 和 BM25 分别检索完整知识库，再用 RRF 合并两张榜。
    教学调试页会展示每条证据的向量名次、BM25 名次和最终 RRF 分数。
 
+.. warning:: 最新质量结论
+
+   第31步四路对照证明RRF改善当前小语料的证据排序，但一次性锁定集因两条新域外表达误召回而
+   ``Gate FAIL``。开发优胜权重1.50没有晋级生产，项目也不宣称Recall已经提升。请先阅读
+   “第31步实验：为什么RRF没有直接晋级”，再使用这组指标写简历。
+
 .. tip::
 
    第一次阅读先看“项目全貌”和“一次请求的一生”；第二次重点阅读“RAG”和“Docker”；面试前再看“项目边界”和“面试题库”。
@@ -48,6 +54,7 @@ ServiceOps Agent：从代码到面试
 
    05_technology_choices
    06_limits_and_next_steps
+   09_hybrid_experiment_result
    07_code_reading_route
    08_glossary
 

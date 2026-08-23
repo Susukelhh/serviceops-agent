@@ -217,3 +217,15 @@
 - 用户明确选择MIT并授权创建首次本地提交；版权主体暂写`ServiceOps Agent contributors`，不猜测真实姓名。
 - 完成后审计284个公开候选文件：PASS 11、WARN 2、BLOCK 0、READY；Warning仅剩未配置origin和简历10处个人占位符。
 - 最终门禁为Ruff PASS、Mypy 84个源码文件 PASS、Pytest 187 passed/2 skipped、依赖锁PASS。
+
+## 2026-08-23：第31步独立Qdrant与完整混合召回实验
+
+- 将纯向量、旧Top-5候选内BM25、全语料BM25和全语料Dense+BM25 RRF放进同变量四路对照。
+- 已揭晓的4组历史数据合并为74条开发回归题；另建16条新holdout，参数冻结前默认不读取。
+- 扫描RRF k 30/60和关键词权重0.40～2.00；开发冻结`hybrid-rrf-k60-lex1.50`。
+- 开发纯向量Recall@5 100%、Top-1 83.87%、MRR 91.18%；冻结RRF Recall 100%、Top-1 93.55%、MRR 96.77%。
+- RRF相对旧候选重排Top-1仅再提高1.61个百分点；逐题7条前移、1条后退。
+- 当前小语料纯向量Top-5已全部召回，Dense+Lexical并集Recall仍100%、关键词救回0条；不能声称召回率提高。
+- 冻结后一次运行16条新holdout：12条正例Recall 100%、Top-1 91.67%、MRR 95.83%；4条负例误召回2条，FPR 50%、Gate FAIL。
+- 两条失败为“有雨吗”和“写一篇考试作文”未命中v1范围规则；不在同一holdout上补规则刷分。
+- 开发优胜关键词权重1.50不晋级生产，现有默认0.80保持；下一步单独评测意图/范围分类漂移。
