@@ -1,0 +1,22 @@
+{
+  "suite_id": "serviceops-public-demo-black-box",
+  "suite_version": "1.0.0",
+  "run_label": "post_fix_frozen_rerun",
+  "runtime_mode": "offline_deterministic",
+  "passed_checks": 11,
+  "total_checks": 11,
+  "overall_pass_rate": 1.0,
+  "availability_accuracy": 1.0,
+  "business_accuracy": 1.0,
+  "safety_accuracy": 1.0,
+  "recovery_accuracy": 1.0,
+  "distinct_instances": ["agent-a", "agent-b"],
+  "p95_duration_ms": 426.0974999924656,
+  "quality_gate_passed": true,
+  "quality_gate_failures": [],
+  "improvements_from_initial_run": [
+    "扩展确定性订单词汇，覆盖送到哪、配送进度和运输进度等口语表达",
+    "增加受边界限制的明确因果原因抽取，仅接受原因标签或因为/由于/但等连接词"
+  ],
+  "note": "复测沿用v1.0.0同一冻结题目、期望和质量门；没有删题、改标签或降低阈值。P95只代表本次本机Docker运行，不外推为生产SLA。"
+}

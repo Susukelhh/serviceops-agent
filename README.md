@@ -646,6 +646,25 @@ lessons/       # 可快速复习的交互式小课
 reference/     # 长期使用的速查资料
 ```
 
+## 公网作品演示
+
+Docker Compose 默认开启零费用公网沙盒模式：页面自动获得十分钟隔离身份，可以直接演示订单工具、
+混合 RAG、人工审批恢复、审计链和 Checkpoint 回放。它不会绕过 JWT，也不会默认消耗千问额度。
+
+本机运行、云服务器安全配置和验收清单见
+[`docs/public-demo-deployment.md`](docs/public-demo-deployment.md)。
+
+部署启动后可以运行第33步新版黑盒盲测。它使用冻结的新措辞，从 Nginx 入口验证双实例、四条业务路径、
+跨会话隔离、Checkpoint interrupt、审批恢复和审计链：
+
+```powershell
+uv run python examples/33_public_demo_end_to_end_blind_test.py
+```
+
+首次运行从 6/11 的真实失败出发，定位并修复口语订单分类和明确因果原因抽取后，同一冻结集达到
+11/11；修复前后证据保存在 `data/evaluation/results/public_demo_blind_v1_*.json`。该结果不外推为线上
+未知流量 100%，新版本仍需建立新的 holdout。
+
 本项目的详细代码注释规则见 [`docs/code-commenting-convention.md`](docs/code-commenting-convention.md)。
 
 ## 下一步

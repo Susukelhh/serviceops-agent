@@ -93,6 +93,11 @@ const elements = {
   clearTokensButton: $("#clear-tokens-button"),
   openTokenPanelButton: $("#open-token-panel-button"),
   headerTokenButton: $("#header-token-button"),
+  // 公网沙盒状态只在后端明确开启演示模式后显示。
+  publicDemoBanner: $("#public-demo-banner"),
+  demoRuntimeLabel: $("#demo-runtime-label"),
+  demoSessionLabel: $("#demo-session-label"),
+  demoExpiryLabel: $("#demo-expiry-label"),
   // 页面辅助动作。
   clearSessionButton: $("#clear-session-button"),
   toast: $("#toast"),
@@ -110,6 +115,16 @@ const state = {
   auditorToken: "",
   // 开发者 Token 只用于 development/test 的脱敏 Checkpoint 历史。
   developerToken: "",
+  // publicDemo 标记 Token 是否由后端匿名沙盒接口签发，而非用户手动粘贴。
+  publicDemo: false,
+  // demoSessionId 只用于页面显示短码，不参与鉴权。
+  demoSessionId: "",
+  // demoExpiresAt 保存毫秒时间戳，便于提交前刷新过期身份。
+  demoExpiresAt: 0,
+  // demoMessageLimit 与后端匿名输入限制保持一致。
+  demoMessageLimit: 500,
+  // demoCountdownTimer 每秒刷新剩余时间，离开页面后由浏览器自动回收。
+  demoCountdownTimer: null,
   // currentThreadId 保存最近一次后端生成的 LangGraph 线程 UUID。
   currentThreadId: "",
   // pendingApproval 保存后端返回的最小审批负载。
@@ -278,6 +293,65 @@ const requireToken = (tokenValue, roleLabel) => {
   openTokenDialog();
   showToast(`请先配置${roleLabel} Token`, "error");
   return false;
+};
+
+// renderDemoCountdown 把短时身份的剩余时间翻译成容易理解的分钟和秒。
+const renderDemoCountdown = () => {
+  // 非公网模式不修改本地 Token 界面。
+  if (!state.publicDemo) {
+    return;
+  }
+  // 向上取整避免刚签发就少显示一秒；负数统一归零。
+  const remainingSeconds = Math.max(0, Math.ceil((state.demoExpiresAt - Date.now()) / 1000));
+  // 分钟和秒钟固定两位，使状态条宽度不会频繁跳动。
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = String(remainingSeconds % 60).padStart(2, "0");
+  elements.demoExpiryLabel.textContent = `剩余 ${minutes}:${seconds}`;
+};
+
+// bootstrapPublicDemo 尝试获取后端短时沙盒身份；404 时自然退回本地手动 Token 模式。
+const bootstrapPublicDemo = async () => {
+  try {
+    // 会话接口不接收用户字段，也不会读取浏览器 Cookie。
+    const result = await requestJson("/api/v1/demo/session", { method: "POST" });
+    const payload = result.payload || {};
+    // 同一沙盒 Token 覆盖四个展示动作；服务端对审批、审计和调试再次检查线程归属。
+    state.customerToken = String(payload.access_token || "");
+    state.reviewerToken = state.customerToken;
+    state.auditorToken = state.customerToken;
+    state.developerToken = state.customerToken;
+    state.publicDemo = Boolean(state.customerToken);
+    state.demoSessionId = String(payload.session_id || "");
+    state.demoExpiresAt = Date.now() + Number(payload.expires_in_seconds || 0) * 1000;
+    state.demoMessageLimit = Number(payload.max_message_chars || 500);
+    // 输入框同步收紧 maxlength，过长文本在发请求前就能被浏览器阻止。
+    elements.messageInput.maxLength = state.demoMessageLimit;
+    // 公网模式隐藏内部身份配置入口，并显示沙盒、模式和倒计时证据。
+    document.body.classList.add("public-demo-mode");
+    elements.publicDemoBanner.classList.remove("hidden");
+    elements.demoRuntimeLabel.textContent = payload.runtime_mode === "paid_model"
+      ? "真实模型模式"
+      : "离线确定性模式";
+    elements.demoSessionLabel.textContent = `会话 ${shortIdentifier(state.demoSessionId, 13)}`;
+    elements.approvalHelp.textContent = "演示审批只会修改本次隔离沙盒数据，不会触碰真实订单。";
+    // 初始调试区不再要求公网访客配置 developer Token。
+    showDebugLocked("运行任一场景后，这里会自动读取本次线程的脱敏 Checkpoint 回放。 ");
+    renderDemoCountdown();
+    // 防止多次续签制造多个计时器。
+    if (state.demoCountdownTimer !== null) {
+      window.clearInterval(state.demoCountdownTimer);
+    }
+    state.demoCountdownTimer = window.setInterval(renderDemoCountdown, 1000);
+    return true;
+  } catch (error) {
+    // 404 表示部署者没有开启公网模式，是本地开发的正常状态。
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return false;
+    }
+    // 网络或服务故障不弹出 Token 对话框，只给出可理解的只读提示。
+    showToast("公网演示身份初始化失败，请稍后刷新页面", "error");
+    return false;
+  }
 };
 
 /* ---------- 同源 API 客户端 ---------- */
@@ -467,7 +541,15 @@ const appendMessage = (role, text, error = false) => {
   const content = createElement("div", "message-content");
   const meta = createElement("div", "message-meta");
   meta.append(
-    createElement("strong", "", isUser ? "user-001" : error ? "执行失败" : "ServiceOps Agent"),
+    createElement(
+      "strong",
+      "",
+      isUser
+        ? (state.publicDemo ? "演示访客" : "user-001")
+        : error
+          ? "执行失败"
+          : "ServiceOps Agent",
+    ),
     createElement("span", "", currentClock()),
   );
   // p.textContent 保留文本但不会执行 HTML。
@@ -1139,7 +1221,8 @@ const renderAuditTrail = (payload) => {
     // 每项只展示事件类型、位置、可信审批主体和哈希前缀。
     const item = createElement("article", "audit-event");
     const title = `#${event.chain_position || "?"} ${event.event_type || "unknown_event"}`;
-    const actor = `actor=${event.actor_id || "unknown"} · approved=${String(event.approved)}`;
+    const actorLabel = state.publicDemo ? "演示访客" : event.actor_id || "unknown";
+    const actor = `actor=${actorLabel} · approved=${String(event.approved)}`;
     const hash = `hash=${shortIdentifier(event.event_hash, 16)}`;
     item.append(
       createElement("strong", "", title),
@@ -1239,6 +1322,10 @@ const submitChat = async (event) => {
   // 已有请求在途时拒绝重复提交。
   if (state.requestRunning) {
     return;
+  }
+  // 公网 Token 即将过期时先静默续签，避免用户完成输入后才收到 401。
+  if (state.publicDemo && state.demoExpiresAt - Date.now() < 5000) {
+    await bootstrapPublicDemo();
   }
   // customer Token 是对话接口唯一身份来源。
   if (!requireToken(state.customerToken, "普通用户")) {
@@ -1486,10 +1573,14 @@ elements.tokenDialog.addEventListener("click", (event) => {
 
 /* ---------- 首次加载 ---------- */
 
-// 页面准备完成后立即读取健康状态，不需要任何登录权限。
+// 页面准备完成后并行读取健康状态和尝试公网沙盒；两者都不需要预先登录。
 refreshHealth();
 
-// 用一次提示告诉新用户先配置短期身份，不强制自动弹窗打断阅读。
-window.setTimeout(() => {
+// 公网开关关闭时才提示开发者粘贴本地角色 Token。
+void bootstrapPublicDemo().then((enabled) => {
+  if (enabled) {
+    showToast("公网安全沙盒已就绪，选择左侧场景即可运行");
+    return;
+  }
   showToast("运行场景前，请先配置本地短期身份 Token");
-}, 500);
+});

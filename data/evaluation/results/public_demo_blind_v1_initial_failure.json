@@ -1,0 +1,28 @@
+{
+  "suite_id": "serviceops-public-demo-black-box",
+  "suite_version": "1.0.0",
+  "run_label": "initial_blind_run_before_fix",
+  "runtime_mode": "offline_deterministic",
+  "passed_checks": 6,
+  "total_checks": 11,
+  "overall_pass_rate": 0.5454545454545454,
+  "availability_accuracy": 1.0,
+  "business_accuracy": 0.3333333333333333,
+  "safety_accuracy": 1.0,
+  "recovery_accuracy": 0.0,
+  "distinct_instances": ["agent-a", "agent-b"],
+  "quality_gate_passed": false,
+  "root_causes": [
+    {
+      "case_id": "blind-order-colloquial-progress",
+      "observed_intent": "human_handoff",
+      "cause": "deterministic_order_vocabulary_gap"
+    },
+    {
+      "case_id": "blind-return-natural-request",
+      "observed_intent": "return_request",
+      "cause": "explicit_causal_reason_not_extracted"
+    }
+  ],
+  "note": "后续恢复与审计失败是退货草案未进入interrupt造成的连锁结果；本文件保留首次盲测失败证据，不用于重新定义题目或降低质量门。"
+}

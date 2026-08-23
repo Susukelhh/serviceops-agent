@@ -107,6 +107,10 @@ async def test_console_static_assets_are_served_with_expected_types() -> None:
     assert "/api/v1/approvals/" in js_response.text
     assert "/api/v1/audit/approvals/" in js_response.text
     assert "/api/v1/debug/threads/" in js_response.text
+    # 公网作品模式必须由后端短时会话引导，不能在 HTML 中硬编码 Token。
+    assert "/api/v1/demo/session" in js_response.text
+    assert "bootstrapPublicDemo" in js_response.text
+    assert ".public-demo-banner" in css_response.text
     assert "renderSelectedCheckpoint" in js_response.text
     # 控制台必须展示新增的第五项Qdrant就绪状态，不能只在后端响应中存在。
     assert 'knowledge_qdrant: "Qdrant 知识索引"' in js_response.text
@@ -155,14 +159,16 @@ def test_console_assets_live_inside_publishable_python_package() -> None:
     assert CONSOLE_DIRECTORY.parent.name == "serviceops_agent"
 
 
-def test_console_does_not_add_demo_auth_bypass_to_openapi() -> None:
-    """为了展示页面不能新增签发 Token 或免认证业务接口。"""
+def test_console_public_demo_keeps_business_api_authenticated() -> None:
+    """公网会话入口可以存在，但不能新增绕过 JWT 的聊天或审批接口。"""
 
     # Arrange/Act：读取 FastAPI 根据真实路由生成的 OpenAPI Schema。
     openapi_paths = app.openapi()["paths"]
     # Assert：控制台与静态资源不是业务接口，不污染 Swagger。
     assert "/console/" not in openapi_paths
     assert "/console/assets/console.js" not in openapi_paths
-    # Assert：不存在前端专用 demo token 或无认证 chat 路由。
+    # Assert：不存在返回固定多角色密钥的旧式接口，也不存在无认证 chat 路由。
     assert "/api/v1/demo/tokens" not in openapi_paths
     assert "/api/v1/demo/chat" not in openapi_paths
+    # 公网入口只签发短时沙盒身份，真正业务仍调用原 JWT 保护路径。
+    assert "/api/v1/demo/session" in openapi_paths

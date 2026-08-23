@@ -11,7 +11,19 @@ from serviceops_agent.graph.state import ServiceState
 # FAQ_KEYWORDS 收集知识型问题的最小触发词，用于建立可重复执行的分类基线。
 FAQ_KEYWORDS = ("保修", "发票", "退换货政策", "售后政策", "营业时间")
 # ORDER_KEYWORDS 收集订单和物流问题触发词，命中后进入订单查询路径。
-ORDER_KEYWORDS = ("订单", "物流", "快递", "发货", "到哪里", "到哪了")
+ORDER_KEYWORDS = (
+    "订单",
+    "物流",
+    "快递",
+    "发货",
+    "到哪里",
+    "到哪了",
+    # 真实用户常说“送到哪一步”，并不一定使用“订单/物流”两个标准词。
+    "送到哪",
+    # “配送进度”和“运输进度”是客服场景中常见的同义表达。
+    "配送进度",
+    "运输进度",
+)
 # RETURN_REQUEST_KEYWORDS 只匹配明确创建动作，普通“退货政策”仍进入只读 FAQ。
 RETURN_REQUEST_KEYWORDS = ("申请退货", "发起退货", "我要退货", "退货申请")
 

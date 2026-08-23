@@ -20,6 +20,8 @@ from serviceops_agent.graph.nodes.classifier import classify_intent
         ("电子发票怎么申请", Intent.FAQ),
         # 包含订单关键词的问题应进入订单状态路径。
         ("我的订单到哪里了", Intent.ORDER_STATUS),
+        # 盲测发现用户只说“送到哪一步”时旧关键词会误转人工。
+        ("麻烦帮我瞅一眼 SO100001 现在送到哪一步了", Intent.ORDER_STATUS),
         # 退货申请关键词必须优先进入需要人工审批的写操作路径。
         ("我要为订单 SO100002 申请退货，原因：商品不合适", Intent.RETURN_REQUEST),
         # 不含已知关键词的问题应采用安全的人工接管兜底。

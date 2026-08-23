@@ -77,6 +77,23 @@ class ChatRequest(BaseModel):
     )
 
 
+class PublicDemoSessionResponse(BaseModel):
+    """公网控制台启动时获得的短期、仅存浏览器内存的沙盒身份。"""
+
+    # access_token 只在本次 HTTPS 响应中返回，前端不会写入 Cookie 或 localStorage。
+    access_token: str = Field(min_length=32)
+    # token_type 明确前端应使用标准 Authorization: Bearer 请求头。
+    token_type: Literal["bearer"] = "bearer"
+    # session_id 是当前访客的隔离主体，可显示末尾短码但不能当成秘密使用。
+    session_id: str = Field(pattern=r"^demo-[a-f0-9]{32}$")
+    # expires_in_seconds 供页面展示倒计时，到期后前端会自动申请新的沙盒身份。
+    expires_in_seconds: int = Field(ge=60, le=1_800)
+    # runtime_mode 告诉访客当前使用零费用确定性链路还是部署者明确允许的真实模型。
+    runtime_mode: Literal["offline_deterministic", "paid_model"]
+    # max_message_chars 让前端限制与后端匿名输入边界保持一致。
+    max_message_chars: int = Field(ge=50, le=1_000)
+
+
 class ApprovalDecisionRequest(BaseModel):
     """审批人恢复退货 interrupt 时提交的 HTTP 请求体。"""
 

@@ -72,5 +72,38 @@ class InMemoryOrderRepository:
         return record
 
 
+class PublicDemoOrderRepository:
+    """把每个公网访客映射到同一份只读样例订单，同时保留会话级身份隔离。"""
+
+    def __init__(
+        self,
+        source_repository: OrderRepository,
+        *,
+        source_user_id: str = "user-001",
+    ) -> None:
+        """保存真实样例仓库和允许公开演示的样例用户。"""
+
+        # 内部仓库仍负责订单归属检查；包装器不会绕过任意用户的订单边界。
+        self._source_repository = source_repository
+        # 只有仓库内专门准备的 user-001 样例订单会被映射给访客。
+        self._source_user_id = source_user_id
+
+    def get_for_user(self, order_id: str, user_id: str) -> OrderRecord | None:
+        """让 demo-* 访客读取样例订单，并把返回记录归属改成当前短期主体。"""
+
+        # 普通 JWT 主体继续使用原身份，不改变本地开发和真实接入时的权限语义。
+        lookup_user_id = self._source_user_id if user_id.startswith("demo-") else user_id
+        # 委托原仓库完成“不存在和越权都返回 None”的安全查询。
+        record = self._source_repository.get_for_user(order_id, lookup_user_id)
+        # 找不到公开样例时保持统一失败结果，不能把其他用户订单映射给访客。
+        if record is None:
+            return None
+        # 公网访客得到一份不可变副本；退货仓库后续校验的 owner 与 JWT sub 一致。
+        if user_id.startswith("demo-"):
+            return record.model_copy(update={"user_id": user_id})
+        # 非演示身份直接返回原领域对象。
+        return record
+
+
 # 应用启动时加载一次模拟数据，避免每次工具调用都重新读取和解析 JSON 文件。
 default_order_repository = InMemoryOrderRepository.from_json(DEFAULT_ORDER_DATA_PATH)

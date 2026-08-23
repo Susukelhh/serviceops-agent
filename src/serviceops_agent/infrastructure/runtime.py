@@ -47,6 +47,7 @@ from serviceops_agent.infrastructure.checkpoint_serde import create_checkpoint_s
 # 订单仓库是退货写入前归属和状态二次检查的数据源。
 from serviceops_agent.infrastructure.order_repository import (
     OrderRepository,
+    PublicDemoOrderRepository,
     default_order_repository,
 )
 
@@ -98,6 +99,12 @@ async def create_agent_runtime(
 ) -> AsyncIterator[AgentRuntime]:
     """按配置创建运行时，并在退出 lifespan 时释放异步 Checkpointer。"""
 
+    # 公网模式只映射专门准备的样例订单；普通模式保持原仓库和真实身份边界。
+    selected_order_repository: OrderRepository = (
+        PublicDemoOrderRepository(order_repository)
+        if settings.public_demo_enabled
+        else order_repository
+    )
     # 每个 API 进程只装配一次混合检索器；远程 Qdrant Collection 由所有副本共享。
     knowledge_retriever = build_default_knowledge_retriever(settings)
     # 根据已启用模式选择公开的低基数事件名，教学页面可区分旧重排和完整双路融合。
@@ -114,14 +121,14 @@ async def create_agent_runtime(
     # memory 模式保持测试完全隔离、快速且不创建磁盘文件。
     if settings.persistence_backend == "memory":
         # 当前进程创建独立业务仓库。
-        memory_return_repository = InMemoryReturnRequestRepository(order_repository)
+        memory_return_repository = InMemoryReturnRequestRepository(selected_order_repository)
         # 测试运行时使用隔离的进程内审计仓库，不创建本地数据库文件。
         memory_audit_repository = InMemoryApprovalAuditRepository()
         # 当前进程创建独立 Checkpointer。
         memory_checkpointer = InMemorySaver(serde=create_checkpoint_serializer())
         # 图同时绑定这两个内存依赖。
         graph = build_service_graph(
-            order_repository=order_repository,
+            order_repository=selected_order_repository,
             return_request_repository=memory_return_repository,
             checkpointer=memory_checkpointer,
             knowledge_retriever=knowledge_retriever,
@@ -146,7 +153,7 @@ async def create_agent_runtime(
         # SQLite 业务仓库会在初始化时创建父目录、WAL 模式和唯一约束表。
         sqlite_return_repository = SQLiteReturnRequestRepository(
             database_path=business_database_path,
-            order_repository=order_repository,
+            order_repository=selected_order_repository,
         )
         # 审计事件属于业务/安全记录，保存在同一业务数据库的独立只追加表中。
         sqlite_audit_repository = SQLiteApprovalAuditRepository(
@@ -167,7 +174,7 @@ async def create_agent_runtime(
             await sqlite_checkpointer.setup()
             # 编译绑定 SQLite Checkpointer 与 SQLite 业务仓库的图。
             graph = build_service_graph(
-                order_repository=order_repository,
+                order_repository=selected_order_repository,
                 return_request_repository=sqlite_return_repository,
                 checkpointer=sqlite_checkpointer,
                 knowledge_retriever=knowledge_retriever,
@@ -204,7 +211,7 @@ async def create_agent_runtime(
         # 退货仓储与 Outbox 协议由同一对象实现，二者可以共享单个数据库事务。
         postgres_return_repository = PostgresReturnRequestRepository(
             pool=postgres_pool,
-            order_repository=order_repository,
+            order_repository=selected_order_repository,
         )
         # 审批审计仓储共享连接池，但使用独立表与只追加触发器。
         postgres_audit_repository = PostgresApprovalAuditRepository(
@@ -220,7 +227,7 @@ async def create_agent_runtime(
             await postgres_checkpointer.setup()
             # 编译一张同时绑定 PostgreSQL 工作流进度和业务仓储的图。
             graph = build_service_graph(
-                order_repository=order_repository,
+                order_repository=selected_order_repository,
                 return_request_repository=postgres_return_repository,
                 checkpointer=postgres_checkpointer,
                 knowledge_retriever=knowledge_retriever,

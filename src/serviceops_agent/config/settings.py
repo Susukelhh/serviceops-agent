@@ -90,6 +90,15 @@ class Settings(BaseSettings):
     # 允许少量服务器时钟误差，但不能无限放宽过期校验。
     jwt_clock_skew_seconds: int = Field(default=10, ge=0, le=60)
 
+    # 公网演示开关默认关闭；只有部署者明确开启后，服务才会签发访客短期身份。
+    public_demo_enabled: bool = False
+    # 访客身份默认十分钟失效，既足够完成四个场景，也缩小链接泄漏后的可用窗口。
+    public_demo_token_minutes: int = Field(default=10, ge=1, le=30)
+    # 公网输入比内部 API 更短，防止匿名访客用超长文本占满模型上下文和进程内存。
+    public_demo_max_message_chars: int = Field(default=500, ge=50, le=1_000)
+    # 默认禁止公网匿名流量调用付费模型；部署者理解费用风险后才能显式打开。
+    public_demo_allow_paid_model: bool = False
+
     # 模型后端开关：mock 使用无密钥关键词基线，openai_compatible 调用兼容接口。
     llm_backend: Literal["mock", "openai_compatible"] = "mock"
     # 服务商提供的模型标识；mock 模式不会读取该字段。
@@ -221,6 +230,14 @@ class Settings(BaseSettings):
         ):
             # 生产应显式选择 OTLP Collector 或 none，避免高流量控制台输出。
             raise ValueError("生产环境遥测导出器不能使用 console")
+        # 匿名公网入口如果直接连接真实模型，爬虫或恶意请求可能快速消耗账户余额。
+        if (
+            self.public_demo_enabled
+            and self.llm_backend == "openai_compatible"
+            and not self.public_demo_allow_paid_model
+        ):
+            # 必须显式确认成本风险，不能因为复制了本地 .env 就意外开启付费流量。
+            raise ValueError("公网演示使用付费模型前必须显式允许付费流量")
         # 返回已经通过组合校验的 Settings。
         return self
 

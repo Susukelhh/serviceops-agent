@@ -21,6 +21,8 @@ class Role(StrEnum):
     # DEVELOPER 代表本地开发调试人员，只能读取已经脱敏的 LangGraph 教学轨迹。
     # 该角色不拥有普通用户查询、退货审批、审计链读取或运维补偿权限。
     DEVELOPER = "developer"
+    # PUBLIC_DEMO 是服务端短时签发的沙盒访客，只能操作属于自己会话的演示线程。
+    PUBLIC_DEMO = "public_demo"
 
 
 class PermissionScope(StrEnum):
@@ -50,6 +52,15 @@ ROLE_SCOPE_POLICY: dict[Role, frozenset[PermissionScope]] = {
     Role.OPERATOR: frozenset({PermissionScope.OUTBOX_RECONCILE}),
     # 开发调试人员只能读取教学轨迹；生产环境路由还会执行第二道关闭检查。
     Role.DEVELOPER: frozenset({PermissionScope.DEBUG_READ}),
+    # 公网访客可完整体验对话、审批、审计与教学回放；各读取路由还会校验线程归属。
+    Role.PUBLIC_DEMO: frozenset(
+        {
+            PermissionScope.AGENT_CHAT,
+            PermissionScope.RETURN_APPROVE,
+            PermissionScope.AUDIT_READ,
+            PermissionScope.DEBUG_READ,
+        }
+    ),
 }
 
 

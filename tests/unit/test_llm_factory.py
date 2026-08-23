@@ -51,3 +51,29 @@ def test_real_backend_fails_fast_without_api_key() -> None:
     with pytest.raises(ValueError, match="SERVICEOPS_LLM_API_KEY"):
         # 创建节点会进入模型工厂并触发失败快速检查。
         build_intent_classifier_node(settings)
+
+
+def test_public_demo_rejects_paid_model_without_explicit_cost_consent() -> None:
+    """匿名公网流量不能因为复制真实模型配置就意外消耗账户余额。"""
+
+    # Act/Assert：同时打开沙盒和真实模型、却没有成本确认时，配置阶段必须直接失败。
+    with pytest.raises(ValueError, match="公网演示使用付费模型"):
+        Settings(
+            public_demo_enabled=True,
+            llm_backend="openai_compatible",
+            public_demo_allow_paid_model=False,
+        )
+
+
+def test_public_demo_can_use_paid_model_only_after_explicit_opt_in() -> None:
+    """部署者显式确认费用风险后，Settings 才允许组合真实模型与公网沙盒。"""
+
+    # Arrange/Act：此处只验证配置组合，不创建客户端或发出任何网络请求。
+    settings = Settings(
+        public_demo_enabled=True,
+        llm_backend="openai_compatible",
+        public_demo_allow_paid_model=True,
+    )
+
+    # Assert：显式开关被保存，后续模型工厂仍会独立检查 API Key 和地址。
+    assert settings.public_demo_allow_paid_model is True

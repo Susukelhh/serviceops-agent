@@ -14,6 +14,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+# timedelta 为公网沙盒身份设置独立短有效期，不复用内部开发 Token 时长。
+from datetime import timedelta
+
 # Path 从已安装 Python 包内部定位随 wheel 一起发布的控制台静态文件。
 from pathlib import Path
 
@@ -64,6 +67,7 @@ from serviceops_agent.api.schemas import (
     ChatResponse,
     DependencyCheck,
     HealthResponse,
+    PublicDemoSessionResponse,
     ReadinessResponse,
     ThreadDebugResponse,
 )
@@ -131,8 +135,12 @@ from serviceops_agent.observability.telemetry import (
 from serviceops_agent.rag.retriever import HealthCheckableKnowledgeRetriever
 
 # JWT 依赖完成签名/Claims/Scope 校验，路由只接收可信 Principal。
-from serviceops_agent.security.jwt_auth import require_principal
-from serviceops_agent.security.models import AuthenticatedPrincipal, PermissionScope
+from serviceops_agent.security.jwt_auth import create_access_token, require_principal
+from serviceops_agent.security.models import (
+    AuthenticatedPrincipal,
+    PermissionScope,
+    Role,
+)
 
 # 读取并缓存应用配置；FastAPI 初始化和各路由可以复用这个不可变配置对象。
 settings = get_settings()
@@ -456,12 +464,74 @@ def _build_thread_config(thread_id: str) -> RunnableConfig:
     return {"configurable": {"thread_id": thread_id}}
 
 
+def _is_public_demo_principal(principal: AuthenticatedPrincipal) -> bool:
+    """判断当前身份是否是后端短时签发的公网沙盒访客。"""
+
+    # 角色来自已经验签和策略复核的 JWT Claims，不能由请求体伪造。
+    return Role.PUBLIC_DEMO in principal.roles
+
+
+def _require_public_demo_thread_owner(
+    *,
+    principal: AuthenticatedPrincipal,
+    state_values: Any,
+) -> None:
+    """限制公网访客只能读取或恢复自己创建的 LangGraph 线程。"""
+
+    # 内部审批人、审计员和开发者继续按原职责访问，不改变企业权限模型。
+    if not _is_public_demo_principal(principal):
+        return
+    # user_id 在 chat 入口只来自 JWT sub；相等才证明线程属于本次演示身份。
+    if not isinstance(state_values, dict) or state_values.get("user_id") != principal.subject:
+        # 统一返回 404，避免访客枚举 UUID 时判断其他线程是否真实存在。
+        raise HTTPException(status_code=404, detail="未找到对应的 Agent 线程")
+
+
+@app.post(
+    "/api/v1/demo/session",
+    response_model=PublicDemoSessionResponse,
+    tags=["public-demo"],
+)
+async def create_public_demo_session(response: Response) -> PublicDemoSessionResponse:
+    """为公网作品页签发一枚短时、会话隔离且不落浏览器磁盘的沙盒 Token。"""
+
+    # 默认关闭意味着普通部署不会因为新增路由而自动开放匿名身份。
+    if not settings.public_demo_enabled:
+        raise HTTPException(status_code=404, detail="未找到资源")
+    # UUID4 的十六进制形式既不可预测又满足 JWT sub 的长度上限。
+    session_id = f"demo-{uuid4().hex}"
+    # 四种演示能力放在一个沙盒角色中；后续敏感路由仍会做线程归属二次校验。
+    access_token = create_access_token(
+        settings=settings,
+        subject=session_id,
+        roles={Role.PUBLIC_DEMO},
+        expires_delta=timedelta(minutes=settings.public_demo_token_minutes),
+    )
+    # 浏览器、CDN 和反向代理都不得缓存携带 Bearer Token 的响应。
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    # 返回页面启动所需的最少配置，不公开密钥、数据库地址或模型服务地址。
+    return PublicDemoSessionResponse(
+        access_token=access_token,
+        session_id=session_id,
+        expires_in_seconds=settings.public_demo_token_minutes * 60,
+        runtime_mode=(
+            "paid_model"
+            if settings.llm_backend == "openai_compatible"
+            else "offline_deterministic"
+        ),
+        max_message_chars=settings.public_demo_max_message_chars,
+    )
+
+
 # 教学调试接口只在 development/test 的 OpenAPI 中出现；production 即使误注册也会返回 404。
 @app.get(
     "/api/v1/debug/threads/{thread_id}",
     response_model=ThreadDebugResponse,
     tags=["development"],
-    include_in_schema=settings.environment != "production",
+    include_in_schema=(
+        settings.environment != "production" or settings.public_demo_enabled
+    ),
 )
 async def get_thread_debug_trace(
     thread_id: UUID,
@@ -472,11 +542,11 @@ async def get_thread_debug_trace(
 ) -> ThreadDebugResponse:
     """返回一个线程经过脱敏的状态与 Checkpoint 教学回放。"""
 
-    # production 必须没有可用调试能力；404 比 403 更少泄漏内部路由设计。
-    if settings.environment == "production":
+    # 生产仅允许受线程归属限制的公网教学沙盒；普通 developer 调试能力仍然关闭。
+    if settings.environment == "production" and not (
+        settings.public_demo_enabled and _is_public_demo_principal(principal)
+    ):
         raise HTTPException(status_code=404, detail="未找到资源")
-    # Security 依赖已经验证 developer Token；路由本身不记录或返回调试者身份。
-    _ = principal
     stable_thread_id = str(thread_id)
     # 官方 aget_state_history 返回“最新在前”，多取一条用于判断是否发生截断。
     snapshots = []
@@ -488,6 +558,11 @@ async def get_thread_debug_trace(
     # 空历史统一返回 404，不区分线程从未存在还是已经被清理。
     if not snapshots:
         raise HTTPException(status_code=404, detail="未找到对应的调试线程")
+    # 最新快照包含线程当前可信 user_id；公网访客不能读取其他会话的回放。
+    _require_public_demo_thread_owner(
+        principal=principal,
+        state_values=snapshots[0].values,
+    )
     truncated = len(snapshots) > MAX_DEBUG_CHECKPOINTS
     # 保留最新的上限数量；响应内再反转为最早到最晚，方便单步播放。
     selected_snapshots = snapshots[:MAX_DEBUG_CHECKPOINTS]
@@ -686,6 +761,12 @@ async def chat(
     第一版图没有外部 I/O，但从一开始保持异步 API 可以减少后续接口改造。
     """
 
+    # 匿名沙盒使用更短输入上限；内部受信用户仍保留 ChatRequest 的 4000 字符能力。
+    if (
+        _is_public_demo_principal(principal)
+        and len(request.message) > settings.public_demo_max_message_chars
+    ):
+        raise HTTPException(status_code=413, detail="演示问题过长，请缩短后重试")
     # 为本次请求生成唯一 UUID，并转为便于 JSON 序列化和日志记录的字符串。
     request_id = str(uuid4())
     # thread_id 是 Checkpointer 快照主键；与 request_id 分开表达恢复和链路两个概念。
@@ -763,6 +844,11 @@ async def review_return_request(
     if not snapshot.values:
         # 404 不暴露其他线程的状态内容。
         raise HTTPException(status_code=404, detail="未找到对应的 Agent 线程")
+    # 公网沙盒即使猜到其他 UUID，也不能审批不属于本次短期身份的线程。
+    _require_public_demo_thread_owner(
+        principal=principal,
+        state_values=snapshot.values,
+    )
     # 只有暂停在指定审批节点且确实包含 interrupt 时才允许恢复。
     if "request_return_approval" not in snapshot.next or not snapshot.interrupts:
         # 已完成或不是审批流程的线程不能重复执行写操作。
@@ -989,6 +1075,18 @@ async def get_approval_audit_trail(
 
     # UUID 转成规范字符串，与审批写入时使用的 thread_id 完全一致。
     stable_thread_id = str(thread_id)
+    # 审计仓库本身不重复保存业务 user_id，因此先从可信 Checkpoint 校验沙盒归属。
+    if _is_public_demo_principal(principal):
+        snapshot = await _get_service_graph().aget_state(
+            _build_thread_config(stable_thread_id)
+        )
+        # 不存在或属于其他访客时都返回相同 404，防止枚举线程与审计记录。
+        if not snapshot.values:
+            raise HTTPException(status_code=404, detail="未找到对应的审批审计记录")
+        _require_public_demo_thread_owner(
+            principal=principal,
+            state_values=snapshot.values,
+        )
     # 获取当前 lifespan 装配的内存、SQLite 或 PostgreSQL 审计仓库。
     audit_repository = _get_approval_audit_repository()
     # 审计读取 Span 不记录 auditor_id、Token 或事件正文，只关联目标线程。

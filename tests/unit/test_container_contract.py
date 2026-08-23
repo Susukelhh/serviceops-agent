@@ -87,8 +87,8 @@ def test_compose_applies_local_only_and_least_privilege_boundaries() -> None:
 
     # Arrange：这里做有限文本契约检查，不为测试配置额外引入 YAML 依赖。
     compose = _load_text("compose.yaml")
-    # Assert：端口只绑定回环地址，避免开发 JWT 配置暴露到局域网。
-    assert '"127.0.0.1:8000:8080"' in compose
+    # Assert：默认仍绑定回环地址；只有公网部署者显式注入地址时才允许对外监听。
+    assert '"${SERVICEOPS_GATEWAY_BIND_ADDRESS:-127.0.0.1}:8000:8080"' in compose
     # 只有 gateway 拥有 ports；两只 Agent 只通过 Compose 内网 expose 8000。
     assert compose.count("ports:") == 1
     assert "agent-a:" in compose

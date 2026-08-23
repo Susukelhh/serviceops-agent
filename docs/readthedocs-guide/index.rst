@@ -56,6 +56,8 @@ ServiceOps Agent：从代码到面试
    06_limits_and_next_steps
    09_hybrid_experiment_result
    10_intent_classification_result
+   11_public_demo
+   12_end_to_end_blind_test
    07_code_reading_route
    08_glossary
 

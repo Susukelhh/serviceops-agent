@@ -41,3 +41,5 @@ docs/readthedocs-guide/_build/
 # 外部面经参考资料只在本机学习，不属于本项目源代码，也可能包含第三方示例配置。
 ai-agent-interview-guide-main/
 ai-agent-interview-guide-main.lnk
+# 本机磁盘空间分析工具生成的报告，与 ServiceOps Agent 项目无关。
+storage_analysis.json

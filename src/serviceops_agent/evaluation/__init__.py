@@ -52,6 +52,15 @@ from serviceops_agent.evaluation.intent_classification_experiment import (
     load_intent_experiment_config,
     run_intent_classification_experiment,
 )
+from serviceops_agent.evaluation.public_demo_blind_evaluator import (
+    PublicDemoBlindCase,
+    PublicDemoBlindCheckResult,
+    PublicDemoBlindConfig,
+    PublicDemoBlindReport,
+    PublicDemoBlindThresholds,
+    evaluate_public_demo_blind_suite,
+    load_public_demo_blind_config,
+)
 from serviceops_agent.evaluation.rag_end_to_end_experiment import (
     RAGEndToEndCase,
     RAGEndToEndCaseResult,
@@ -148,6 +157,12 @@ __all__ = [
     "IntentEvaluationCase",
     "IntentProfileResult",
     "IntentQualityGate",
+    # 公网入口黑盒盲测的数据契约、逐项结果和聚合报告。
+    "PublicDemoBlindCase",
+    "PublicDemoBlindCheckResult",
+    "PublicDemoBlindConfig",
+    "PublicDemoBlindReport",
+    "PublicDemoBlindThresholds",
     # 真实千问聊天 + 确定性检索的稳定 profile 名称。
     "QWEN_CANDIDATE_PROFILE",
     # 单条人工标注评测样本。
@@ -199,6 +214,7 @@ __all__ = [
     "evaluate_grounding_client",
     "evaluate_intent_predictions",
     "evaluate_keyword_intent_baseline",
+    "evaluate_public_demo_blind_suite",
     # 按黄金参考路径估算候选聊天模型调用量。
     "estimate_planned_qwen_chat_calls",
     # 执行整个 RAG 检索数据集的评测函数。
@@ -212,6 +228,7 @@ __all__ = [
     "load_grounding_sufficiency_experiment_config",
     "load_intent_evaluation_cases",
     "load_intent_experiment_config",
+    "load_public_demo_blind_config",
     # 从受版本控制 JSON 加载评测集。
     "load_rag_evaluation_cases",
     "load_rag_end_to_end_cases",

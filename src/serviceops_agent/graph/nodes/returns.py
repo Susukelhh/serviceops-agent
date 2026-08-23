@@ -42,6 +42,10 @@ from serviceops_agent.tools.return_tools import create_return_request_tool
 RETURN_ORDER_ID_PATTERN = re.compile(r"\bSO\d{6}\b", flags=re.IGNORECASE)
 # 原因必须使用“原因：”或“理由：”明确分隔，避免系统自行猜测用户意图。
 RETURN_REASON_PATTERN = re.compile(r"(?:原因|理由)\s*[：:]\s*(?P<reason>.+)$")
+# 用户也可能用“因为/由于/但是”明确表达原因；只截取到下一个标点，避免吞入后续指令。
+RETURN_CAUSAL_REASON_PATTERN = re.compile(
+    r"(?:因为|由于|但是|但|不过)\s*(?P<reason>[^，,。！？!?]{5,80})(?:[，,。！？!?]|$)"
+)
 
 # 模块 Logger 不记录审批备注、退货原因、工具结果或异常正文。
 logger = logging.getLogger(__name__)
@@ -50,6 +54,22 @@ logger = logging.getLogger(__name__)
 type StateUpdate = dict[str, object]
 # ReturnNode 是可以注册到 LangGraph 的同步节点签名。
 type ReturnNode = Callable[[ServiceState], StateUpdate]
+
+
+def extract_explicit_return_reason(message: str) -> str | None:
+    """从带原因标签或明确因果连接词的退货请求中提取用户原话。"""
+
+    # “原因：...”是最明确、向后兼容的第一优先级格式。
+    labeled_match = RETURN_REASON_PATTERN.search(message)
+    if labeled_match is not None:
+        # strip 只去掉边界空白，不改写用户陈述。
+        return labeled_match.group("reason").strip()
+    # 没有标签时，只接受“因为/由于/但”等明确因果语法，不从任意剩余文本猜原因。
+    causal_match = RETURN_CAUSAL_REASON_PATTERN.search(message)
+    if causal_match is None:
+        return None
+    # 返回标点前的有限原文，仍由后续长度和 Pydantic 约束复核。
+    return causal_match.group("reason").strip()
 
 
 def create_return_request_proposal_node(
@@ -89,10 +109,10 @@ def create_return_request_proposal_node(
 
         # 规范化为大写，保持仓库、工具和审批负载一致。
         order_id = order_match.group(0).upper()
-        # 原因必须由用户明确标记，不能让模型或代码从剩余文本猜测。
-        reason_match = RETURN_REASON_PATTERN.search(message)
+        # 原因必须由标签或明确因果连接词表达，不能从任意剩余文本猜测。
+        reason = extract_explicit_return_reason(message)
         # 没有明确原因时同样不创建审批任务。
-        if reason_match is None:
+        if reason is None:
             # 返回原因澄清状态。
             return {
                 # 回显目标订单号，方便用户补充。
@@ -111,8 +131,6 @@ def create_return_request_proposal_node(
                 "events": ["graph:return_request_reason_required"],
             }
 
-        # 去除原因两侧空白，Pydantic 还会检查最小和最大长度。
-        reason = reason_match.group("reason").strip()
         # 原因不足五个字符时不产生含糊草案。
         if len(reason) < 5:
             # 返回更具体的澄清提示。

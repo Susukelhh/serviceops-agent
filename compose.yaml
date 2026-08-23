@@ -6,7 +6,13 @@ x-agent-environment: &agent-environment
   # 容器内项目根目录用于定位种子知识库等只读资源。
   SERVICEOPS_PROJECT_ROOT: /app
   # 当前 Compose 面向本地学习与验收，不假装成真实生产环境。
-  SERVICEOPS_ENVIRONMENT: development
+  SERVICEOPS_ENVIRONMENT: ${SERVICEOPS_ENVIRONMENT:-development}
+  # 本地 Docker 作品演示默认自动签发十分钟沙盒身份；不会绕过任何业务 API 鉴权。
+  SERVICEOPS_PUBLIC_DEMO_ENABLED: ${SERVICEOPS_PUBLIC_DEMO_ENABLED:-true}
+  SERVICEOPS_PUBLIC_DEMO_TOKEN_MINUTES: ${SERVICEOPS_PUBLIC_DEMO_TOKEN_MINUTES:-10}
+  SERVICEOPS_PUBLIC_DEMO_MAX_MESSAGE_CHARS: ${SERVICEOPS_PUBLIC_DEMO_MAX_MESSAGE_CHARS:-500}
+  # 默认明确禁止匿名访客消耗真实模型额度。
+  SERVICEOPS_PUBLIC_DEMO_ALLOW_PAID_MODEL: ${SERVICEOPS_PUBLIC_DEMO_ALLOW_PAID_MODEL:-false}
   # 默认使用零费用、可重复的模拟模型，启动容器不会消耗千问额度。
   SERVICEOPS_LLM_BACKEND: mock
   # 确定性规划器使回归测试每次得到相同的路由结果。
@@ -102,7 +108,7 @@ services:
     user: "101:101"
     # Windows 仍访问 localhost:8000，但这个端口现在属于网关而不是某只 Agent。
     ports:
-      - "127.0.0.1:8000:8080"
+      - "${SERVICEOPS_GATEWAY_BIND_ADDRESS:-127.0.0.1}:8000:8080"
     # 两个后端都健康后才启动入口，减少刚启动时出现 502 的概率。
     depends_on:
       agent-a:
