@@ -92,6 +92,9 @@ qwen-intent-threshold-0.85
 这100%只对应32条开发题。锁定集尚未运行，生产提示仍没有切换；下一次只允许按冻结Profile运行一次16条
 新holdout，不能根据锁定失败回头修改v2后继续使用同一张考卷。
 
+锁定脚本不会重新调用32条开发题。它读取已经版本化的开发摘要，校验当前提示指纹、冻结Profile名称和阈值
+仍属于1.1.0候选集合，然后只对16条新holdout发出16次增量聊天调用。
+
 ## PyCharm配置
 
 - Script path：`D:\serviceops-agent\examples\32_intent_classification_experiment.py`

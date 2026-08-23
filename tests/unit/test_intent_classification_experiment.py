@@ -112,6 +112,25 @@ def test_holdout_requires_real_client_and_frozen_candidate() -> None:
         asyncio.run(run_intent_classification_experiment(config, include_holdout=True))
 
 
+def test_holdout_reuses_frozen_development_result_and_only_calls_new_cases() -> None:
+    """锁定路径不应为阈值选择重复支付32次开发调用。"""
+
+    config = load_intent_experiment_config(CONFIG_PATH)
+    report = asyncio.run(
+        run_intent_classification_experiment(
+            config,
+            qwen_client=_AlwaysMedicalFAQClient(),
+            include_holdout=True,
+        )
+    )
+
+    assert report.qwen_development_candidates == []
+    assert report.selected_profile_id == config.frozen_candidate_profile_id
+    assert report.frozen_profile_matches_selection is True
+    assert report.successful_chat_calls == config.holdout_case_count
+    assert report.qwen_holdout_candidate is not None
+
+
 def test_safety_qwen_profile_reuses_predictions_and_blocks_medical_collision() -> None:
     """组合候选应复用模型调用，并把明确医疗域外表达强制转人工。"""
 

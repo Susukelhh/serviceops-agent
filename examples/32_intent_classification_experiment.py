@@ -91,24 +91,28 @@ async def _run() -> int:
     print(f"实验：{report.experiment_id} v{report.experiment_version}")
     print(f"提示指纹匹配：{report.prompt_matches_config}")
     print(f"真实开发计划调用：{report.planned_development_chat_calls} 次")
+    print(f"锁定集增量计划调用：{report.planned_holdout_chat_calls} 次")
     print("\n关键词规则基线：")
     _print_profile(report.keyword_development_baseline)
-    if not report.qwen_development_candidates:
+    if not report.qwen_development_candidates and report.qwen_holdout_candidate is None:
         print("\n千问候选：未运行（当前命令零费用）")
         print(f"基线失败样本：{report.keyword_development_baseline.failed_case_ids}")
         print(f"报告：{REPORT_PATH}")
         return 0
-    print("\n千问阈值候选：")
-    for candidate in report.qwen_development_candidates:
-        _print_profile(candidate)
-    print(f"\n开发优胜候选：{report.selected_profile_id}")
-    print(f"冻结候选匹配：{report.frozen_profile_matches_selection}")
-    print(f"实际成功聊天调用：{report.successful_chat_calls} 次")
+    if report.qwen_development_candidates:
+        print("\n千问阈值候选：")
+        for candidate in report.qwen_development_candidates:
+            _print_profile(candidate)
+        print(f"\n开发优胜候选：{report.selected_profile_id}")
+        print(f"冻结候选匹配：{report.frozen_profile_matches_selection}")
+        print(f"实际成功聊天调用：{report.successful_chat_calls} 次")
     if report.qwen_holdout_candidate is None:
         print("意图锁定集：未运行")
         print(f"报告：{REPORT_PATH}")
         return 0 if report.frozen_profile_matches_selection else 1
     print("\n一次性意图锁定结果：")
+    print(f"冻结候选：{report.selected_profile_id}")
+    print(f"实际锁定聊天调用：{report.successful_chat_calls} 次")
     _print_profile(report.qwen_holdout_candidate)
     print(f"报告：{REPORT_PATH}")
     return 0 if report.qwen_holdout_candidate.quality_gate_passed else 1

@@ -144,6 +144,8 @@ class IntentClassificationExperimentReport(BaseModel):
     prompt_sha256: str
     prompt_matches_config: bool
     planned_development_chat_calls: int = Field(ge=0)
+    # planned_holdout_chat_calls 单独公开锁定路径增量，避免误以为会重跑开发调用。
+    planned_holdout_chat_calls: int = Field(ge=0)
     successful_chat_calls: int = Field(ge=0)
     keyword_development_baseline: IntentProfileResult
     qwen_development_candidates: list[IntentProfileResult]
@@ -419,7 +421,8 @@ async def run_intent_classification_experiment(
     )
     qwen_candidates: list[IntentProfileResult] = []
     successful_calls = 0
-    if qwen_client is not None:
+    # 普通真实开发运行才调用32条开发题；holdout路径复用已经版本化冻结的开发结论。
+    if qwen_client is not None and not include_holdout:
         if not prompt_matches:
             raise ValueError("当前分类提示指纹与实验配置不一致，禁止运行真实候选")
         raw_predictions, successful_calls = await _collect_qwen_predictions(
@@ -476,8 +479,21 @@ async def run_intent_classification_experiment(
     if include_holdout:
         if qwen_client is None:
             raise ValueError("运行意图holdout必须显式提供真实千问客户端")
-        if selected is None or not frozen_matches:
-            raise ValueError("意图开发优胜者与冻结Profile不一致，禁止运行holdout")
+        # 合法冻结名称必须能由当前配置的阈值候选生成，防止手写任意Profile绕过开发选择。
+        allowed_frozen_profiles = {
+            f"qwen-intent-threshold-{threshold:.2f}"
+            for threshold in config.confidence_threshold_candidates
+        } | {
+            f"safety-qwen-v2-threshold-{threshold:.2f}"
+            for threshold in config.confidence_threshold_candidates
+        }
+        if config.frozen_candidate_profile_id not in allowed_frozen_profiles:
+            raise ValueError("冻结意图Profile不属于当前版本候选集合")
+        # 从冻结名称解析本地置信度阈值，不重新消费开发集模型调用。
+        frozen_threshold = float(config.frozen_candidate_profile_id.rsplit("-", maxsplit=1)[1])
+        # 报告明确显示锁定路径采用的既有开发优胜名称。
+        selected_profile_id = config.frozen_candidate_profile_id
+        frozen_matches = True
         holdout_cases = load_intent_evaluation_cases(
             resolve_project_path(config.holdout_dataset_path)
         )
@@ -489,7 +505,7 @@ async def run_intent_classification_experiment(
         )
         successful_calls += holdout_calls
         # 只有开发优胜者属于安全组合路线时，锁定集才应用同一前置规则。
-        if selected.classifier_kind == "safety_qwen_candidate":
+        if config.frozen_candidate_profile_id.startswith("safety-"):
             holdout_predictions = _apply_existing_safety_gate(
                 holdout_cases,
                 holdout_predictions,
@@ -499,8 +515,12 @@ async def run_intent_classification_experiment(
             holdout_predictions,
             profile_id=config.frozen_candidate_profile_id,
             dataset="holdout",
-            classifier_kind="qwen_candidate",
-            confidence_threshold=selected.confidence_threshold,
+            classifier_kind=(
+                "safety_qwen_candidate"
+                if config.frozen_candidate_profile_id.startswith("safety-")
+                else "qwen_candidate"
+            ),
+            confidence_threshold=frozen_threshold,
             gate=config.holdout_gate,
         )
     return IntentClassificationExperimentReport(
@@ -510,6 +530,7 @@ async def run_intent_classification_experiment(
         prompt_sha256=prompt_hash,
         prompt_matches_config=prompt_matches,
         planned_development_chat_calls=len(development_cases),
+        planned_holdout_chat_calls=config.holdout_case_count,
         successful_chat_calls=successful_calls,
         keyword_development_baseline=keyword_baseline,
         qwen_development_candidates=qwen_candidates,
