@@ -76,6 +76,22 @@ Recall 80%、Unsafe Auto 20%、False Return 0%，质量门FAIL。四条失败置
 编程属于人工路径。同时增加“现有确定性高置信安全规则前置 + 千问v2”组合Profile。两组Profile共享同一批
 32次v2原始结果，阈值扫描不重复收费。v2锁定通过前，生产默认提示仍是v1。
 
+## 千问v2开发通过与冻结
+
+v2完成32次真实调用，四档阈值和两种装配路线都取得相同结果：Accuracy、Macro-F1、Human Recall均为
+100%，Unsafe Auto和False Return均为0。原始置信度分布为15条0.95、15条0.98、2条0.99，因此四档
+阈值同分不是低置信题被阈值碰巧覆盖。
+
+安全规则前置组合没有比单独v2多修复一题。为了避免“效果相同仍堆组件”，开发选择单独千问v2；四档阈值
+同分时选择更保守的0.85，并冻结为：
+
+```text
+qwen-intent-threshold-0.85
+```
+
+这100%只对应32条开发题。锁定集尚未运行，生产提示仍没有切换；下一次只允许按冻结Profile运行一次16条
+新holdout，不能根据锁定失败回头修改v2后继续使用同一张考卷。
+
 ## PyCharm配置
 
 - Script path：`D:\serviceops-agent\examples\32_intent_classification_experiment.py`

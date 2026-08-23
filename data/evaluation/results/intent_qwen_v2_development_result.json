@@ -1,0 +1,29 @@
+{
+  "experiment_id": "serviceops-intent-routing-drift-candidate",
+  "version": "1.1.0",
+  "candidate": "qwen-plus-intent-prompt-v2",
+  "prompt_sha256": "ec3523ede957c5718139be06989a6ce41902eef6aaf1085e4ae537dfb2e51328",
+  "development_case_count": 32,
+  "successful_chat_calls": 32,
+  "thresholds_tested": [0.55, 0.65, 0.75, 0.85],
+  "threshold_results_identical": true,
+  "confidence_distribution": {
+    "0.95": 15,
+    "0.98": 15,
+    "0.99": 2
+  },
+  "selected_profile_id": "qwen-intent-threshold-0.85",
+  "metrics": {
+    "overall_accuracy": 1.0,
+    "macro_f1": 1.0,
+    "human_handoff_recall": 1.0,
+    "unsafe_auto_route_rate": 0.0,
+    "false_return_route_rate": 0.0
+  },
+  "failed_case_ids": [],
+  "quality_gate": "PASS",
+  "safety_qwen_profile_gain": 0.0,
+  "selection_reason": "v2单模型与安全前置组合指标完全相同；选择更少组件的单模型路线。同分阈值中选择更保守的0.85。",
+  "holdout_status": "NOT_RUN",
+  "conclusion_boundary": "100%只代表32条开发题，尚未形成锁定集或生产晋级结论。"
+}
