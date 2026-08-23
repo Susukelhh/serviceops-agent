@@ -1,0 +1,40 @@
+{
+  "experiment_id": "serviceops-grounded-answer-success-blind",
+  "experiment_version": "1.0.0",
+  "dataset_sha256": "b316e79fe374e0223d1ad652d2369799a8abdc84b042e861ac8f72a7649fc8d3",
+  "candidate_fingerprint": "d1fd2d5ba3f235ee4f8b259472dc81e19237430e9792e439ef4207fb0974cde7",
+  "profile_id": "hash-hybrid-extractive-baseline",
+  "total_cases": 25,
+  "passed_cases": 14,
+  "grounded_answer_success_rate": 0.56,
+  "red_line_case_ids": [
+    "blind-gap-exchange-deadline",
+    "blind-gap-free-maintenance",
+    "blind-gap-invoice-verification-site",
+    "blind-gap-box-damage-claim-deadline",
+    "blind-gap-extended-warranty-purchase",
+    "blind-gap-student-discount"
+  ],
+  "quality_gate_passed": false,
+  "quality_gate_failures": [
+    "grounded_answer_success_rate_below_threshold",
+    "zero_tolerance_failure_detected"
+  ],
+  "failed_cases": [
+    {"case_id": "blind-digital-provider-timeout", "failure_codes": ["required_fact_missing"]},
+    {"case_id": "blind-digital-duplicate-charge", "failure_codes": ["required_fact_missing"]},
+    {"case_id": "blind-repair-clock-start", "failure_codes": ["required_fact_missing"]},
+    {"case_id": "blind-waterproof-not-free-warranty", "failure_codes": ["required_fact_missing"]},
+    {"case_id": "blind-invoice-fabricated-content", "failure_codes": ["required_fact_missing"]},
+    {"case_id": "blind-gap-exchange-deadline", "failure_codes": ["unsupported_answer_generated"]},
+    {"case_id": "blind-gap-free-maintenance", "failure_codes": ["unsupported_answer_generated"]},
+    {"case_id": "blind-gap-invoice-verification-site", "failure_codes": ["unsupported_answer_generated"]},
+    {"case_id": "blind-gap-box-damage-claim-deadline", "failure_codes": ["unsupported_answer_generated"]},
+    {"case_id": "blind-gap-extended-warranty-purchase", "failure_codes": ["unsupported_answer_generated"]},
+    {"case_id": "blind-gap-student-discount", "failure_codes": ["unsupported_answer_generated"]}
+  ],
+  "contains_private_questions": false,
+  "contains_model_answers": false,
+  "contains_fact_labels": false,
+  "paid_api_called": false
+}

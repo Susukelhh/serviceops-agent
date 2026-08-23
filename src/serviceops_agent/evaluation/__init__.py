@@ -24,6 +24,21 @@ from serviceops_agent.evaluation.experiment import (
     run_candidate_experiment,
     summarize_candidate_experiment,
 )
+from serviceops_agent.evaluation.grounded_answer_success_experiment import (
+    ForbiddenClaimRule,
+    GroundedAnswerSuccessCase,
+    GroundedAnswerSuccessCaseResult,
+    GroundedAnswerSuccessExperimentConfig,
+    GroundedAnswerSuccessExperimentReport,
+    GroundedAnswerSuccessSummary,
+    RequiredFactRule,
+    evaluate_grounded_answer_success,
+    grounded_answer_candidate_fingerprint,
+    load_grounded_answer_success_config,
+    load_private_grounded_answer_cases,
+    run_grounded_answer_success_experiment,
+    validate_grounded_answer_evidence_labels,
+)
 from serviceops_agent.evaluation.grounding_sufficiency_experiment import (
     GroundingCaseResult,
     GroundingEvaluationCase,
@@ -151,6 +166,14 @@ __all__ = [
     "GroundingQualityGate",
     "GroundingSufficiencyExperimentConfig",
     "GroundingSufficiencyExperimentReport",
+    # 第34步事实级金标、单题结果、单一成功率汇总与实验契约。
+    "ForbiddenClaimRule",
+    "GroundedAnswerSuccessCase",
+    "GroundedAnswerSuccessCaseResult",
+    "GroundedAnswerSuccessExperimentConfig",
+    "GroundedAnswerSuccessExperimentReport",
+    "GroundedAnswerSuccessSummary",
+    "RequiredFactRule",
     "IntentCaseResult",
     "IntentClassificationExperimentConfig",
     "IntentClassificationExperimentReport",
@@ -212,6 +235,7 @@ __all__ = [
     # 运行完整 LangGraph 并计算端到端指标。
     "evaluate_agent_dataset",
     "evaluate_grounding_client",
+    "evaluate_grounded_answer_success",
     "evaluate_intent_predictions",
     "evaluate_keyword_intent_baseline",
     "evaluate_public_demo_blind_suite",
@@ -226,6 +250,8 @@ __all__ = [
     "load_candidate_experiment_config",
     "load_grounding_evaluation_cases",
     "load_grounding_sufficiency_experiment_config",
+    "load_grounded_answer_success_config",
+    "load_private_grounded_answer_cases",
     "load_intent_evaluation_cases",
     "load_intent_experiment_config",
     "load_public_demo_blind_config",
@@ -244,6 +270,7 @@ __all__ = [
     # 运行基线和真实候选多轮实验。
     "run_candidate_experiment",
     "run_grounding_sufficiency_experiment",
+    "run_grounded_answer_success_experiment",
     "run_intent_classification_experiment",
     # 运行第24步零费用困难Baseline。
     "run_rag_problem_baseline",
@@ -254,7 +281,9 @@ __all__ = [
     "run_rag_end_to_end_experiment",
     # 从既有单轮结果聚合稳定性和晋级结论。
     "summarize_candidate_experiment",
+    "validate_grounded_answer_evidence_labels",
     "grounding_prompt_sha256",
+    "grounded_answer_candidate_fingerprint",
     "intent_classifier_prompt_sha256",
     "rag_end_to_end_candidate_fingerprint",
 ]

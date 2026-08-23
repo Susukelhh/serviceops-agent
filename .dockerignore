@@ -29,6 +29,7 @@ dist/
 # SQLite、WAL、评测报告和本地向量索引属于运行状态，必须通过卷在运行时提供。
 data/runtime/
 data/backups/
+data/private_evaluation/
 
 # 单元测试、示例和学习资料保留在仓库中，但不属于最小运行镜像输入。
 tests/

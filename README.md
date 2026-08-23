@@ -31,7 +31,7 @@ flowchart LR
 [`docs/architecture.md`](docs/architecture.md)；90 秒面试画法见
 [`docs/architecture/interview-whiteboard.md`](docs/architecture/interview-whiteboard.md)。
 
-## 当前进度：第 30 步——GitHub发布验收与公开安全
+## 当前进度：第 34 步——端到端有据回答成功率盲测（首次结果 10/25，Gate FAIL）
 
 项目默认使用确定性关键词分类器，保证没有模型密钥也能运行；同时已经提供可切换的
 OpenAI 兼容模型通道，用 Pydantic 约束模型只能返回意图、置信度和简短原因。
@@ -357,6 +357,26 @@ uv run python examples/31_hybrid_retrieval_experiment.py
 默认离线/CI仍使用零费用关键词分类器。详见
 [`docs/steps/32-intent-classification-drift-experiment.md`](docs/steps/32-intent-classification-drift-experiment.md)。
 
+第34步针对第29步“引用正确文档但没有逐项检查答案事实”的短板，只保留一个主指标：
+`端到端有据回答成功率 = 严格完整通过题数 / 全部密封盲测题数`。可回答题必须把全部关键事实答对，
+而且每个事实都能被实际引用切片支持；知识缺口题必须拒答。25道私有题、候选参数、唯一门槛和红线已经
+用SHA-256冻结，题目正文与金标不进入Git或生成提示。零费用对照严格通过14/25（56%）；首次千问候选
+严格通过10/25（40%），质量门FAIL。千问把知识缺口正确拒答从0/6提高到5/6，但19道可回答题只有5道
+完整覆盖全部必要事实，另有1道知识缺口仍被自动回答。人工复核同时发现部分事实金标把背景说明也设成了
+硬门，因此40%是v1严格口径而非模型通用正确率；首次结果仍原样保留，不事后改分。详见
+[`docs/steps/34-end-to-end-grounded-answer-success-rate.md`](docs/steps/34-end-to-end-grounded-answer-success-rate.md)。
+
+```powershell
+# 仅预检：不读取私有题目，不调用千问
+uv run python examples/34_grounded_answer_success_experiment.py
+
+# 零费用读取密封集并运行离线风险对照
+uv run python examples/34_grounded_answer_success_experiment.py --confirm-blind
+
+# 首次真实冻结候选：会调用千问并产生费用
+uv run python examples/34_grounded_answer_success_experiment.py --confirm-blind --confirm-paid-api
+```
+
 运行两个订单的可控工具循环与最大步数安全停止演示：
 
 ```powershell
@@ -668,6 +688,14 @@ uv run python examples/33_public_demo_end_to_end_blind_test.py
 本项目的详细代码注释规则见 [`docs/code-commenting-convention.md`](docs/code-commenting-convention.md)。
 
 ## 下一步
+
+第34步的公开契约、事实级评分器和密封题集已经完成。零费用 Hash + BM25 + RRF + Extractive 对照在
+25题上严格通过14题，有据回答成功率56%；6条知识缺口全部被相似资料带偏并自动作答，另有5条可回答题
+缺少必要事实，因此质量门FAIL。首次千问候选严格通过10/25（40%）：正确拒答5/6，但可回答题完整通过
+只有5/19；没有禁止事实或非法引用，主要失败是答案遗漏必要信息，另有1条无依据自动回答。首次FAIL已经
+原样冻结；v1从现在起只能作为回归集。后续先用本地私有诊断区分“真实漏答”和“同义表达未命中”，修复后
+还要识别“金标范围过严”。现有脱敏报告没有保存原始答案，不能正式重算；必须用新的v2密封集验证，
+不能在同一批题上反复调到100%后继续称为盲测。
 
 核心 Agent 工程链路到第 23 步已经闭环：模型/检索/工具/人工审批、评测、鉴权、审计、可观测、
 Outbox、容器、PostgreSQL、Schema Migration、双实例故障切换、过载恢复和可验证数据库备份都有代码

@@ -43,3 +43,6 @@ ai-agent-interview-guide-main/
 ai-agent-interview-guide-main.lnk
 # 本机磁盘空间分析工具生成的报告，与 ServiceOps Agent 项目无关。
 storage_analysis.json
+
+# 真正的盲测题目与事实金标不能提前进入公开仓库；仓库只保存数量、SHA-256 和脱敏结果。
+data/private_evaluation/
