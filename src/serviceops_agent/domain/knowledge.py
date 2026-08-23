@@ -4,6 +4,9 @@
 from datetime import date
 from enum import StrEnum
 
+# Literal 把检索通道和融合方法限制为少量可审计字符串。
+from typing import Literal
+
 # BaseModel 提供运行时校验；Field 为知识字段声明长度、数值范围和接口说明。
 from pydantic import BaseModel, Field
 
@@ -81,12 +84,24 @@ class KnowledgeChunk(BaseModel):
 
 
 class RetrievalHit(BaseModel):
-    """向量检索返回的一条经过领域校验的命中结果。"""
+    """检索链路返回的一条经过领域校验、可解释来源的命中结果。"""
 
     # chunk 是完整证据切片，回答节点只能使用这里存在的知识内容。
     chunk: KnowledgeChunk
-    # score 是 Qdrant 返回的余弦相似度，用于阈值判断和排序解释。
+    # score 是当前阶段使用的最终排序分数；纯向量模式是余弦分数，混合模式是归一化 RRF 分数。
     score: float = Field(ge=-1.01, le=1.01)
+    # dense_score 保存 Qdrant 原始余弦相似度；没有进入向量召回榜时为 None。
+    dense_score: float | None = Field(default=None, ge=-1.01, le=1.01)
+    # lexical_score 保存 BM25 原始词面相关性；没有进入关键词召回榜时为 None。
+    lexical_score: float | None = Field(default=None, ge=0.0)
+    # dense_rank 是该切片在独立向量召回榜中的一基排名，例如第一名为 1。
+    dense_rank: int | None = Field(default=None, ge=1)
+    # lexical_rank 是该切片在独立 BM25 召回榜中的一基排名。
+    lexical_rank: int | None = Field(default=None, ge=1)
+    # retrieval_channels 明确说明这条证据由哪几条召回通道找到，便于页面解释和离线评测。
+    retrieval_channels: list[Literal["dense", "lexical"]] = Field(default_factory=list)
+    # fusion_method 区分纯向量、旧候选内重排和完整 RRF 混合召回，避免把不同分数直接比较。
+    fusion_method: Literal["dense", "candidate_bm25", "rrf"] | None = None
 
 
 class Citation(BaseModel):

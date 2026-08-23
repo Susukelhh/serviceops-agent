@@ -65,6 +65,12 @@ from serviceops_agent.infrastructure.return_repository import (
     SQLiteReturnRequestRepository,
 )
 
+# 默认检索器在 lifespan 内只构建一次，并把独立 Qdrant 健康探测暴露给 FastAPI。
+from serviceops_agent.rag.retriever import (
+    HealthCheckableKnowledgeRetriever,
+    build_default_knowledge_retriever,
+)
+
 
 @dataclass(frozen=True)
 class AgentRuntime:
@@ -78,6 +84,8 @@ class AgentRuntime:
     return_outbox_repository: ReturnOutboxRepository
     # approval_audit_repository 负责追加审批决定/结果并向审计接口提供只读链。
     approval_audit_repository: ApprovalAuditRepository
+    # knowledge_retriever 同时服务 LangGraph FAQ 节点和 /ready 的 Qdrant 只读探测。
+    knowledge_retriever: HealthCheckableKnowledgeRetriever
     # persistence_backend 便于健康接口和日志确认实际运行模式。
     persistence_backend: Literal["memory", "sqlite", "postgres"]
 
@@ -89,6 +97,19 @@ async def create_agent_runtime(
     order_repository: OrderRepository = default_order_repository,
 ) -> AsyncIterator[AgentRuntime]:
     """按配置创建运行时，并在退出 lifespan 时释放异步 Checkpointer。"""
+
+    # 每个 API 进程只装配一次混合检索器；远程 Qdrant Collection 由所有副本共享。
+    knowledge_retriever = build_default_knowledge_retriever(settings)
+    # 根据已启用模式选择公开的低基数事件名，教学页面可区分旧重排和完整双路融合。
+    retrieval_event = (
+        "graph:faq_candidates_fused_rrf"
+        if settings.rag_reranker == "hybrid_rrf"
+        else (
+            "graph:faq_candidates_reranked_bm25"
+            if settings.rag_reranker == "bm25"
+            else None
+        )
+    )
 
     # memory 模式保持测试完全隔离、快速且不创建磁盘文件。
     if settings.persistence_backend == "memory":
@@ -103,6 +124,8 @@ async def create_agent_runtime(
             order_repository=order_repository,
             return_request_repository=memory_return_repository,
             checkpointer=memory_checkpointer,
+            knowledge_retriever=knowledge_retriever,
+            retrieval_event=retrieval_event,
         )
         # lifespan 存续期间向 FastAPI 提供资源。
         yield AgentRuntime(
@@ -110,6 +133,7 @@ async def create_agent_runtime(
             return_request_repository=memory_return_repository,
             return_outbox_repository=memory_return_repository,
             approval_audit_repository=memory_audit_repository,
+            knowledge_retriever=knowledge_retriever,
             persistence_backend="memory",
         )
         # 内存对象不持有外部连接，退出后直接结束生成器即可。
@@ -146,6 +170,8 @@ async def create_agent_runtime(
                 order_repository=order_repository,
                 return_request_repository=sqlite_return_repository,
                 checkpointer=sqlite_checkpointer,
+                knowledge_retriever=knowledge_retriever,
+                retrieval_event=retrieval_event,
             )
             # 整个 FastAPI lifespan 复用同一异步 Saver 连接。
             yield AgentRuntime(
@@ -153,6 +179,7 @@ async def create_agent_runtime(
                 return_request_repository=sqlite_return_repository,
                 return_outbox_repository=sqlite_return_repository,
                 approval_audit_repository=sqlite_audit_repository,
+                knowledge_retriever=knowledge_retriever,
                 persistence_backend="sqlite",
             )
         # 离开 async with 后 Saver 连接已关闭，不再允许图处理新请求。
@@ -196,6 +223,8 @@ async def create_agent_runtime(
                 order_repository=order_repository,
                 return_request_repository=postgres_return_repository,
                 checkpointer=postgres_checkpointer,
+                knowledge_retriever=knowledge_retriever,
+                retrieval_event=retrieval_event,
             )
             # API lifespan 内所有请求复用这些受限资源。
             yield AgentRuntime(
@@ -203,6 +232,7 @@ async def create_agent_runtime(
                 return_request_repository=postgres_return_repository,
                 return_outbox_repository=postgres_return_repository,
                 approval_audit_repository=postgres_audit_repository,
+                knowledge_retriever=knowledge_retriever,
                 persistence_backend="postgres",
             )
     finally:

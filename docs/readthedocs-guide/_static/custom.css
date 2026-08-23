@@ -1,0 +1,42 @@
+/* 固定左侧目录，让长文档滚动时仍能随时切换模块。 */
+.wy-nav-side {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  overflow-y: auto;
+}
+
+/* 正文略微加宽，代码路径和流程图不容易挤成多行。 */
+.wy-nav-content {
+  max-width: 1080px;
+}
+
+/* 中文正文使用更舒适的字号与行距。 */
+.rst-content {
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.rst-content h1,
+.rst-content h2,
+.rst-content h3 {
+  line-height: 1.35;
+}
+
+/* “一句话理解”类提示框使用柔和蓝色，帮助快速复习。 */
+.rst-content .admonition.tip {
+  border-left: 4px solid #2980b9;
+}
+
+/* 表格在窄屏允许横向滚动，避免列内容被压坏。 */
+.rst-content table.docutils {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+}
+
+@media screen and (max-width: 768px) {
+  .wy-nav-side {
+    position: fixed;
+  }
+}

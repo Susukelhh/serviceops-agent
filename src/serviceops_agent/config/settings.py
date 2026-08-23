@@ -129,10 +129,16 @@ class Settings(BaseSettings):
     # 单次 Embedding 请求包含的文本条数；qwen3.7最多20条，v4最多10条。
     embedding_batch_size: int = Field(default=20, ge=1, le=100)
 
-    # Qdrant 的本地存储位置；:memory: 不写磁盘，路径字符串则启用本地持久化。
+    # Qdrant 的本地存储位置；只有未配置远程 URL 时才使用，保留本地学习和单测能力。
     qdrant_location: str = ":memory:"
+    # 独立 Qdrant 服务地址；Docker 中填写 http://qdrant:6333，本地模式保持 None。
+    qdrant_url: str | None = None
+    # 远程 Qdrant 可选 API Key；SecretStr 防止日志和配置 repr 暴露真实密钥。
+    qdrant_api_key: SecretStr | None = None
+    # Qdrant 建库、健康检查和查询的单次客户端超时秒数。
+    qdrant_timeout_seconds: int = Field(default=10, ge=1, le=120)
     # Collection 名称用于隔离不同知识库、模型版本和向量维度。
-    qdrant_collection: str = "serviceops_knowledge_v1"
+    qdrant_collection: str = "serviceops_knowledge_v2"
     # 受治理知识源文件路径；生产环境可通过仓库协议替换为 CMS 或对象存储。
     knowledge_source_path: str = "data/seed/knowledge_documents.json"
 
@@ -142,12 +148,22 @@ class Settings(BaseSettings):
     rag_score_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
     # 查询范围策略在Embedding前拒绝高置信域外和敏感请求；off只用于Baseline对照。
     rag_query_policy: Literal["off", "deterministic_v1"] = "deterministic_v1"
-    # 候选重排后端；off保留原Qdrant顺序，bm25只重新排列已有候选。
-    rag_reranker: Literal["off", "bm25"] = "bm25"
+    # 检索模式：off为纯向量，bm25为旧候选内重排，hybrid_rrf为完整双路召回。
+    rag_reranker: Literal["off", "bm25", "hybrid_rrf"] = "hybrid_rrf"
     # BM25词面分数在“向量 + 词面”融合分数中的占比，需要由排序实验选择。
     rag_rerank_lexical_weight: float = Field(default=0.25, ge=0.0, le=1.0)
     # 重排前固定召回的候选切片数，必须不少于最终rag_top_k才有纠错空间。
     rag_rerank_candidate_k: int = Field(default=5, ge=1, le=20)
+    # 完整混合召回中，Qdrant 向量通道独立从全库取回的候选数量。
+    rag_hybrid_dense_k: int = Field(default=8, ge=1, le=50)
+    # 完整混合召回中，BM25 关键词通道独立从全库取回的候选数量。
+    rag_hybrid_lexical_k: int = Field(default=8, ge=1, le=50)
+    # RRF 排名常数；值越大越看重两路共同出现，越不放大榜首之间的小差异。
+    rag_hybrid_rrf_k: int = Field(default=60, ge=1, le=500)
+    # 向量榜在 RRF 中的权重，解决同义改写和口语表达的语义召回问题。
+    rag_hybrid_dense_weight: float = Field(default=1.0, gt=0.0, le=10.0)
+    # BM25 榜在 RRF 中的权重，补强订单术语、政策名称和精确关键词命中。
+    rag_hybrid_lexical_weight: float = Field(default=0.8, gt=0.0, le=10.0)
     # 单个知识切片的最大字符数；第一版使用字符近似，后续会增加 Token 精确计数。
     rag_chunk_size: int = Field(default=500, ge=100, le=2000)
     # 相邻切片重复保留的字符数，帮助跨边界问题同时召回前后语义。
@@ -169,6 +185,13 @@ class Settings(BaseSettings):
         if self.rag_reranker == "bm25" and self.rag_rerank_candidate_k < self.rag_top_k:
             # 错误只描述字段关系，不包含查询或知识内容。
             raise ValueError("RAG 重排候选数不能小于最终 Top-K")
+        # 完整混合召回的两条通道都应至少能独立提供最终 Top-K 数量。
+        if self.rag_reranker == "hybrid_rrf" and (
+            self.rag_hybrid_dense_k < self.rag_top_k
+            or self.rag_hybrid_lexical_k < self.rag_top_k
+        ):
+            # 启动阶段立即暴露组合错误，避免线上某条通道被配置成名存实亡。
+            raise ValueError("RAG 混合召回的两路候选数都不能小于最终 Top-K")
         # 只有选择 postgres 模式时才强制连接地址，SQLite 学习模式仍可零配置启动。
         if self.persistence_backend == "postgres" and (
             self.postgres_dsn is None

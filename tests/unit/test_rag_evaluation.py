@@ -34,6 +34,8 @@ def test_hash_retrieval_baseline_meets_offline_quality_gate() -> None:
             qdrant_collection="test_rag_evaluation",
             # 0.10 是由当前正负例共同校准的证据阈值。
             rag_score_threshold=0.10,
+            # 该测试冻结历史 Hash+候选内BM25基线，新混合链路由独立测试和实验验收。
+            rag_reranker="bm25",
         )
     )
 

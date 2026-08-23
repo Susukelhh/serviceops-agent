@@ -10,7 +10,7 @@ flowchart LR
     USER["五种最小权限角色\nConsole / API"]
     EDGE["Nginx + FastAPI\n限流 / Schema / JWT"]
     GRAPH{"LangGraph\nState + 条件边"}
-    FAQ["FAQ\nQdrant + 证据门"]
+    FAQ["FAQ\nQdrant + BM25 + RRF"]
     ORDER["订单 Agent\n规划 ↔ 工具观察"]
     RETURN["退货\ninterrupt + 人审"]
     PG[("PostgreSQL\nCheckpoint / 业务 / 审计")]
@@ -37,7 +37,7 @@ flowchart LR
 OpenAI 兼容模型通道，用 Pydantic 约束模型只能返回意图、置信度和简短原因。
 模型认证失败、限流、超时、网络异常或结构化输出失败时，会生成脱敏故障状态并进入人工
 接管路径，不再让外部模型异常直接击穿 FastAPI。
-FAQ 已接入受治理知识源、稳定切片、可替换 Embedding、Qdrant 向量检索、证据阈值和 Citation；
+FAQ 已接入受治理知识源、稳定切片、可替换 Embedding、独立 Qdrant、全语料 BM25、RRF 融合、证据阈值和 Citation；
 只有检索到已发布公共证据才会回答，无证据、低分或检索故障会安全转人工。
 在此基础上，回答层支持确定性摘录和真实千问结构化生成两种模式；模型只能从本次候选切片中
 选择引用，伪造引用、空引用、主动拒答或生成服务异常都会被第三道条件边拦截。项目还加入了
@@ -209,6 +209,7 @@ Top-1 从 90% 提高到 100%、MRR 从 95% 提高到 100%，Recall 保持 100% �
 - 简单 RAG 回归集与 v2 困难开发/锁定集，支持 Recall@K、MRR、Top-1、nDCG 和负例误召回率；
 - Embedding 前确定性 FAQ 范围门、敏感请求拒绝事件、阈值扫描和冻结候选 holdout 质量门；
 - 固定 Top-5 内 BM25 词面重排、权重扫描、候选集合不变量与独立排序 holdout；
+- 独立持久化 Qdrant、全库向量/BM25 双路召回、RRF 融合和通道级排名解释；
 - 固定证据充分性评测、`is_answerable`结构化拒答、无依据回答率和提示指纹冻结；
 - 身份由系统注入、模型只能提供订单号的只读 LangChain Tool；
 - JSON 模拟订单仓库、订单归属检查和越权信息隐藏；
@@ -611,10 +612,10 @@ src/serviceops_agent/
 ├── operations/ # PostgreSQL 备份、隔离恢复和其他显式运维能力
 ├── security/  # JWT Claims、签发/验证和角色—Scope策略
 ├── tools/     # 身份绑定的只读/写入 LangChain Tools
-├── rag/       # 切片、Embedding、Qdrant、受约束生成
+├── rag/       # 切片、Embedding、独立 Qdrant、BM25、RRF 和受约束生成
 └── web/       # 随 wheel 发布的 Agent 控制台 HTML/CSS/JavaScript
 Dockerfile     # 多阶段、固定依赖、非 root 单进程运行镜像
-compose.yaml   # Nginx + 双 Agent + 一次性迁移 + PostgreSQL
+compose.yaml   # Nginx + 双 Agent + 一次性迁移 + PostgreSQL + 独立 Qdrant
 deploy/nginx/  # 轮询、Docker DNS 重解析、超时与安全响应头配置
 tests/         # 单元、图/API、SQLite 与真实 PostgreSQL 集成测试
 examples/      # 对照课程学习的最小示例

@@ -89,7 +89,7 @@ def main() -> int:
             # 输出有限状态，不打印可能由代理追加的完整原始响应。
             print(f"FAIL liveness: http={health_status}, status={health_body.get('status')}")
             return 1
-        # 第二个探针会真实读取 Checkpointer、业务库、Outbox 和审计库。
+        # 第二个探针会真实读取四类状态存储和独立 Qdrant Collection。
         ready_status, ready_body = _request_json(f"{base_url}/ready")
         # readiness 必须是 200/ready，不能把“端口已开”等同于“可以接收流量”。
         if ready_status != 200 or ready_body.get("status") != "ready":
@@ -97,18 +97,19 @@ def main() -> int:
             return 1
         # checks 应是组件名到有限状态对象的字典。
         dependency_checks = ready_body.get("checks", {})
-        # 四个关键依赖必须全部存在且处于 ready。
+        # 五个关键依赖必须全部存在且处于 ready。
         expected_dependencies = {
             "checkpointer",
             "return_repository",
             "outbox_repository",
             "audit_repository",
+            "knowledge_qdrant",
         }
         # 只比较固定组件名和状态，不输出数据库异常或内部文件路径。
         if set(dependency_checks) != expected_dependencies or any(
             check.get("status") != "ready" for check in dependency_checks.values()
         ):
-            print("FAIL readiness dependencies: expected four ready components")
+            print("FAIL readiness dependencies: expected five ready components")
             return 1
         # 最后故意不带 Token 请求业务接口，验证容器没有绕过 JWT 认证。
         auth_status, _ = _request_json(
@@ -126,7 +127,7 @@ def main() -> int:
         return 1
 
     # 三层契约全部通过后输出适合截图和面试演示的短结论。
-    print("PASS: liveness=ok, readiness=ready(4/4), unauthenticated_chat=401")
+    print("PASS: liveness=ok, readiness=ready(5/5), unauthenticated_chat=401")
     # 返回 0 让本地终端或 CI 将脚本识别为成功。
     return 0
 

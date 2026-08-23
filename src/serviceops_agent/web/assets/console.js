@@ -550,7 +550,11 @@ const eventDescriptor = (rawEvent) => {
   if (normalized.includes("intent") || normalized.includes("classified")) {
     return { title: "识别业务意图", description: "输出有限意图、置信度与路由原因", kind: "default" };
   }
-  // rerank事件单独展示“只改变候选顺序”，避免与第一次召回混为一层。
+  // 完整RRF事件说明两条通道都独立访问全库，而不是在向量候选内部重排。
+  if (normalized.includes("fused_rrf")) {
+    return { title: "合并两路独立召回", description: "Qdrant与BM25分别查全库，再用RRF合并名次", kind: "retrieval" };
+  }
+  // 旧rerank事件仍展示“只改变候选顺序”，供历史实验回放。
   if (normalized.includes("rerank")) {
     return { title: "重新排列知识候选", description: "融合向量与BM25词面分数，不新增候选文档", kind: "retrieval" };
   }
@@ -733,6 +737,47 @@ const nodeListText = (nodes, emptyText) => {
 
 // createDebugFieldCard 展示一个当前 State 字段及其解释。
 const createDebugFieldCard = (field) => {
+  // retrieval_hits 需要并排比较两路排名，使用专门卡片比阅读原始 JSON 更直观。
+  if (field.name === "retrieval_hits" && Array.isArray(field.value)) {
+    const card = createElement("article", "debug-field-card retrieval-explain-card");
+    const heading = createElement("div", "debug-field-heading");
+    const title = createElement("div", "");
+    title.append(
+      createElement("strong", "", field.label || "混合召回候选"),
+      createElement("code", "", "dense + lexical → RRF"),
+    );
+    heading.append(title, createElement("span", "debug-category", "RAG"));
+    card.append(
+      heading,
+      createElement("p", "debug-field-description", "Qdrant 与 BM25 各自查完整知识库；同一切片按名次融合，不显示高维向量。"),
+    );
+    const candidateList = createElement("div", "retrieval-candidate-list");
+    // 每个候选独立展示最终名次依据，缺少某一路时明确显示“未入榜”。
+    field.value.forEach((hit, index) => {
+      const candidate = createElement("section", "retrieval-candidate");
+      const candidateHeading = createElement("div", "retrieval-candidate-heading");
+      const finalScore = Number(hit && hit.score);
+      candidateHeading.append(
+        createElement("strong", "", `${index + 1}. ${(hit && hit.title) || "未命名知识"}`),
+        createElement("span", "retrieval-final-score", Number.isFinite(finalScore) ? `RRF ${finalScore.toFixed(3)}` : "最终分数 —"),
+      );
+      const ranks = createElement("div", "retrieval-rank-row");
+      ranks.append(
+        createElement("span", hit && hit.dense_rank ? "rank-chip active" : "rank-chip", hit && hit.dense_rank ? `Qdrant #${hit.dense_rank}` : "Qdrant 未入榜"),
+        createElement("span", hit && hit.lexical_rank ? "rank-chip active lexical" : "rank-chip", hit && hit.lexical_rank ? `BM25 #${hit.lexical_rank}` : "BM25 未入榜"),
+        createElement("span", "rank-chip method", (hit && hit.fusion_method) || "legacy"),
+      );
+      const preview = createElement("p", "retrieval-preview", (hit && hit.content_preview) || "没有公开证据预览。 ");
+      candidate.append(candidateHeading, ranks, preview);
+      candidateList.append(candidate);
+    });
+    // 空候选同样给出明确含义，避免用户误以为页面加载失败。
+    if (field.value.length === 0) {
+      candidateList.append(createElement("p", "debug-empty", "两条召回通道都没有产生合格证据。"));
+    }
+    card.append(candidateList);
+    return card;
+  }
   const card = createElement("article", "debug-field-card");
   const heading = createElement("div", "debug-field-heading");
   const title = createElement("div", "");

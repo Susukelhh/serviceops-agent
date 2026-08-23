@@ -116,6 +116,7 @@ def build_service_graph(
     classifier_node: IntentClassifierNode | None = None,
     order_repository: OrderRepository | None = None,
     knowledge_retriever: KnowledgeRetriever | None = None,
+    retrieval_event: str | None = None,
     faq_query_policy: KnowledgeQueryPolicy | None = None,
     faq_answer_client: GroundedAnswerClient | None = None,
     tool_planner: ToolPlanner | None = None,
@@ -188,11 +189,15 @@ def build_service_graph(
     )
     # 创建已经绑定 Top-K 配置的 FAQ 检索节点；默认值来自缓存 Settings。
     # 只有默认工厂真实装配BM25时才公开重排事件；测试替身不能冒充执行过重排。
-    selected_rerank_event = (
+    selected_rerank_event = retrieval_event or (
         # 使用低基数稳定事件名供控制台和评测读取。
-        "graph:faq_candidates_reranked_bm25"
-        # 同时满足默认检索器与bm25配置时才启用。
-        if knowledge_retriever is None and current_settings.rag_reranker == "bm25"
+        (
+            "graph:faq_candidates_fused_rrf"
+            if current_settings.rag_reranker == "hybrid_rrf"
+            else "graph:faq_candidates_reranked_bm25"
+        )
+        # 只有工厂内部真实装配重排/融合时，才自动公开对应事件。
+        if knowledge_retriever is None and current_settings.rag_reranker != "off"
         # 自定义检索器或关闭模式不追加事件。
         else None
     )

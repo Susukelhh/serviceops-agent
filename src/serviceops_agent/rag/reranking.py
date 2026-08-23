@@ -196,6 +196,12 @@ class BM25CandidateReranker:
                 chunk=hit.chunk,
                 # 融合分数已经限制在0到1，满足领域Schema。
                 score=combined_score,
+                # 保留原始向量分数，避免旧重排模式丢失第一阶段依据。
+                dense_score=hit.dense_score if hit.dense_score is not None else hit.score,
+                # 当前 BM25 只在向量候选内部计算，因此不声称拥有独立 lexical_rank。
+                retrieval_channels=["dense", "lexical"],
+                # 明确这是旧候选内 BM25，而不是完整双路 RRF。
+                fusion_method="candidate_bm25",
             )
             # 只返回调用方需要的前top_k条。
             for _, combined_score, hit in ranked_hits[:top_k]
@@ -234,3 +240,14 @@ class RerankingKnowledgeRetriever:
         raw_hits = self._retriever.search(query, top_k=candidate_limit)
         # rerank只接收raw_hits，不可能引入集合外文档。
         return self._reranker.rerank(query=query, hits=raw_hits, top_k=top_k)
+
+    def health_check(self) -> None:
+        """把生产就绪探测委托给底层 Qdrant 检索器。"""
+
+        # 默认底层实现 health_check；测试替身缺失时给出明确装配错误。
+        health_check = getattr(self._retriever, "health_check", None)
+        # 不把没有健康探测的自定义对象误判为可用于生产。
+        if not callable(health_check):
+            raise RuntimeError("底层向量检索器未提供 Qdrant 健康检查")
+        # 原样传播 Qdrant 连接或 Collection 异常，由 readiness 统一脱敏处理。
+        health_check()

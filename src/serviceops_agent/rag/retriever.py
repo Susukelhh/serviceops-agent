@@ -35,6 +35,13 @@ class KnowledgeRetriever(Protocol):
         """返回已经按分数降序排列且通过阈值过滤的证据。"""
 
 
+class HealthCheckableKnowledgeRetriever(KnowledgeRetriever, Protocol):
+    """生产默认检索器额外提供独立 Qdrant 的只读就绪探测。"""
+
+    def health_check(self) -> None:
+        """确认活动知识 Collection 可访问；失败时直接抛出基础设施异常。"""
+
+
 class QdrantKnowledgeRetriever:
     """使用 Qdrant 保存知识向量并执行余弦相似度查询。"""
 
@@ -63,19 +70,44 @@ class QdrantKnowledgeRetriever:
         *,
         chunker: KnowledgeChunker,
     ) -> None:
-        """Collection 不存在时创建并写入文档；已存在时保持幂等。"""
+        """幂等创建并补齐 Collection，兼容多个 Agent 实例并发启动。"""
 
-        # 持久化模式已经存在 Collection 时直接复用，避免每次启动重复调用 Embedding。
-        if self._client.collection_exists(self._collection_name):
-            # 生产知识更新应走显式版本化重建流程，不在请求启动阶段静默覆盖。
-            return
-        # 新 Collection 需要完整切分并向量化所有可索引文档。
+        # 先切片才能知道目标索引应包含多少 Point，并判断共享 Collection 是否已经完整。
         chunks = chunker.split_documents(documents)
         # 没有发布文档时拒绝创建空知识库，防止系统误以为索引已经就绪。
         if not chunks:
             # 错误只描述治理结果，不包含文档正文。
             raise ValueError("没有可写入知识索引的已发布公共文档")
-        # 批量生成向量；真实千问适配器会自动按每批 10 条切分请求。
+        # exists 保存共享 Qdrant 中是否已经有同名 Collection。
+        collection_exists = self._client.collection_exists(self._collection_name)
+        # 已存在且 Point 数量不少于当前受治理语料时直接复用，避免重复调用真实 Embedding。
+        if collection_exists and self._client.count(
+            collection_name=self._collection_name,
+            exact=True,
+        ).count >= len(chunks):
+            # 知识更新仍应通过显式版本化 Collection 发布，本启动逻辑只补齐缺失初始索引。
+            return
+        # Collection 不存在时先创建空的向量结构；多个副本可能同时走到这里。
+        if not collection_exists:
+            try:
+                # 创建单一默认向量 Collection，距离度量使用余弦相似度。
+                self._client.create_collection(
+                    # 使用配置中的稳定 Collection 名称。
+                    collection_name=self._collection_name,
+                    # size 必须与 EmbeddingClient.dimension 完全一致。
+                    vectors_config=models.VectorParams(
+                        # 固定向量维度。
+                        size=self._embedding_client.dimension,
+                        # Cosine 分数越高表示查询与知识切片越相似。
+                        distance=models.Distance.COSINE,
+                    ),
+                )
+            except Exception:
+                # 另一个 Agent 副本抢先创建同名 Collection 属于正常启动竞争。
+                if not self._client.collection_exists(self._collection_name):
+                    # 若重查仍不存在，说明不是并发冲突，保留原异常阻止假健康启动。
+                    raise
+        # Collection 缺少完整 Point 时批量生成向量；真实适配器会自动分批请求。
         vectors = self._embedding_client.embed_documents(
             # 标题和正文共同参与向量化，提高短问题召回主题的能力。
             [chunk.embedding_text() for chunk in chunks]
@@ -85,18 +117,6 @@ class QdrantKnowledgeRetriever:
             # 在写入 Qdrant 前立即终止，避免生成不可审计索引。
             raise ValueError("Embedding 返回数量与知识切片数量不一致")
 
-        # 创建单一默认向量 Collection，距离度量使用归一化语义检索常见的余弦相似度。
-        self._client.create_collection(
-            # 使用配置中的稳定 Collection 名称。
-            collection_name=self._collection_name,
-            # size 必须与 EmbeddingClient.dimension 完全一致。
-            vectors_config=models.VectorParams(
-                # 固定向量维度。
-                size=self._embedding_client.dimension,
-                # Cosine 分数越高表示查询与知识切片越相似。
-                distance=models.Distance.COSINE,
-            ),
-        )
         # 把每个切片、向量和可过滤元数据组装成 Qdrant Point。
         points = [
             models.PointStruct(
@@ -119,6 +139,12 @@ class QdrantKnowledgeRetriever:
             # 等待本次更新完成。
             wait=True,
         )
+
+    def health_check(self) -> None:
+        """只读获取 Collection 元数据，验证 Qdrant 服务、网络和索引同时可用。"""
+
+        # get_collection 不写数据；远程连接、鉴权或 Collection 异常都会直接抛出。
+        self._client.get_collection(collection_name=self._collection_name)
 
     def search(self, query: str, *, top_k: int) -> list[RetrievalHit]:
         """向量化用户查询，并返回通过证据阈值的领域命中。"""
@@ -159,6 +185,14 @@ class QdrantKnowledgeRetriever:
                     "chunk": point.payload,
                     # point.score 是当前查询与切片的余弦相似度。
                     "score": point.score,
+                    # 单独保存原始向量分数，RRF 融合后仍能解释这一通道的贡献。
+                    "dense_score": point.score,
+                    # Qdrant 返回顺序就是向量榜名次；append 前长度加一得到一基排名。
+                    "dense_rank": len(hits) + 1,
+                    # 当前命中来自向量通道。
+                    "retrieval_channels": ["dense"],
+                    # 纯 Qdrant 阶段的分数语义是 dense。
+                    "fusion_method": "dense",
                 }
             )
             # 追加经过 Schema 校验的命中。
@@ -167,8 +201,23 @@ class QdrantKnowledgeRetriever:
         return hits
 
 
-def create_qdrant_client(location: str) -> QdrantClient:
-    """根据配置创建 Qdrant 内存或本地磁盘客户端。"""
+def create_qdrant_client(
+    location: str,
+    *,
+    url: str | None = None,
+    api_key: str | None = None,
+    timeout_seconds: int = 10,
+) -> QdrantClient:
+    """优先连接独立 Qdrant 服务，否则创建兼容学习和测试的本地客户端。"""
+
+    # 配置 URL 时不再把索引放进当前 Agent 进程，所有副本共享同一独立服务。
+    if url is not None:
+        # url 支持 Docker 服务名、内网地址或 Qdrant Cloud HTTPS 地址。
+        return QdrantClient(
+            url=url,
+            api_key=api_key,
+            timeout=timeout_seconds,
+        )
 
     # :memory: 是 Qdrant 官方本地内存模式，进程结束后自动释放索引。
     if location == ":memory:":
@@ -182,7 +231,7 @@ def create_qdrant_client(location: str) -> QdrantClient:
 
 def build_default_knowledge_retriever(
     settings: Settings | None = None,
-) -> KnowledgeRetriever:
+) -> HealthCheckableKnowledgeRetriever:
     """从项目配置和受治理 JSON 知识源构建默认检索器。"""
 
     # 显式 settings 便于测试不同维度和阈值；生产代码读取缓存配置。
@@ -196,8 +245,17 @@ def build_default_knowledge_retriever(
     documents = repository.list_indexable_documents()
     # 根据配置选择零费用哈希或真实千问 Embedding。
     embedding_client = create_embedding_client(current_settings)
-    # 创建支持内存或本地磁盘持久化的 Qdrant 客户端。
-    qdrant_client = create_qdrant_client(current_settings.qdrant_location)
+    # 创建独立服务优先、本地模式后备的 Qdrant 客户端。
+    qdrant_client = create_qdrant_client(
+        current_settings.qdrant_location,
+        url=current_settings.qdrant_url,
+        api_key=(
+            current_settings.qdrant_api_key.get_secret_value()
+            if current_settings.qdrant_api_key is not None
+            else None
+        ),
+        timeout_seconds=current_settings.qdrant_timeout_seconds,
+    )
     # 组装 Qdrant 检索器，但此时尚未必存在 Collection。
     retriever = QdrantKnowledgeRetriever(
         # 注入已创建的 Qdrant 客户端。
@@ -222,6 +280,28 @@ def build_default_knowledge_retriever(
     if current_settings.rag_reranker == "off":
         # 原检索器已经可以直接处理search。
         return retriever
+    # 完整混合模式让两路检索器分别读取全语料，再按名次融合。
+    if current_settings.rag_reranker == "hybrid_rrf":
+        # 局部导入避免 hybrid 模块引用检索协议时形成模块初始化循环。
+        from serviceops_agent.rag.hybrid import (  # noqa: PLC0415
+            BM25CorpusRetriever,
+            ReciprocalRankFusionRetriever,
+        )
+
+        # BM25 使用与 Qdrant 完全相同的治理后切片，但独立建立全语料词面索引。
+        lexical_retriever = BM25CorpusRetriever(
+            chunks=chunker.split_documents(documents),
+        )
+        # 返回完整双路召回器；它会保留每路原分数、排名和最终 RRF 分数。
+        return ReciprocalRankFusionRetriever(
+            dense_retriever=retriever,
+            lexical_retriever=lexical_retriever,
+            dense_k=current_settings.rag_hybrid_dense_k,
+            lexical_k=current_settings.rag_hybrid_lexical_k,
+            rrf_k=current_settings.rag_hybrid_rrf_k,
+            dense_weight=current_settings.rag_hybrid_dense_weight,
+            lexical_weight=current_settings.rag_hybrid_lexical_weight,
+        )
     # 局部导入避免reranking模块为类型协议反向导入本模块时形成初始化循环。
     from serviceops_agent.rag.reranking import (  # noqa: PLC0415
         BM25CandidateReranker,

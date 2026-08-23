@@ -127,6 +127,9 @@ from serviceops_agent.observability.telemetry import (
     start_safe_span,
 )
 
+# 默认生产检索器协议同时提供搜索与独立 Qdrant 就绪探测。
+from serviceops_agent.rag.retriever import HealthCheckableKnowledgeRetriever
+
 # JWT 依赖完成签名/Claims/Scope 校验，路由只接收可信 Principal。
 from serviceops_agent.security.jwt_auth import require_principal
 from serviceops_agent.security.models import AuthenticatedPrincipal, PermissionScope
@@ -167,6 +170,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.return_request_repository = runtime.return_request_repository
         # 协调器通过同一个具体仓库的 Outbox 协议读取事务事件。
         application.state.return_outbox_repository = runtime.return_outbox_repository
+        # 同一个检索器实例既被图节点调用，也用于证明共享 Qdrant Collection 可读。
+        application.state.knowledge_retriever = runtime.knowledge_retriever
         # yield 期间 Uvicorn 才会正式接收 HTTP 请求。
         yield
     # 退出上下文后 SQLite Saver 已关闭，Uvicorn 随后完成进程停止。
@@ -274,6 +279,8 @@ app.state.approval_audit_repository = InMemoryApprovalAuditRepository()
 app.state.return_request_repository = default_return_request_repository
 # 默认内存退货仓库同时实现 Outbox 协议，支持未进入 lifespan 的轻量测试。
 app.state.return_outbox_repository = default_return_request_repository
+# 不进入 lifespan 的轻量 ASGI 单测没有外部 Qdrant 生命周期，使用 None 明确标记后备模式。
+app.state.knowledge_retriever = None
 # 未进入 lifespan 的 ASGITransport 单测仍使用相同默认容量语义。
 app.state.agent_capacity_limiter = asyncio.BoundedSemaphore(settings.agent_max_in_flight_requests)
 
@@ -395,6 +402,16 @@ def _get_return_outbox_repository() -> ReturnOutboxRepository:
     )
 
 
+def _get_knowledge_retriever() -> HealthCheckableKnowledgeRetriever | None:
+    """取得 lifespan 装配的共享知识检索器；None 只可能出现在无 lifespan 轻量单测。"""
+
+    # Starlette State 是动态属性容器，cast 只恢复静态类型，不会创建新客户端。
+    return cast(
+        HealthCheckableKnowledgeRetriever | None,
+        app.state.knowledge_retriever,
+    )
+
+
 def _build_approval_audit_draft(
     *,
     thread_id: str,
@@ -481,10 +498,10 @@ async def get_thread_debug_trace(
     )
 
 
-# readiness 会真实读取四个关键持久化边界；失败时返回 503 而 liveness 仍保持 200。
+# readiness 会真实读取五个关键持久化边界；失败时返回 503 而 liveness 仍保持 200。
 @app.get("/ready", response_model=ReadinessResponse, tags=["system"])
 async def readiness_check(response: Response) -> ReadinessResponse:
-    """验证 Checkpointer、业务仓库、事务 Outbox 和审批审计仓库是否可读。"""
+    """验证 Checkpointer、业务仓库、Outbox、审计仓库和 Qdrant 是否可读。"""
 
     # 固定组件名形成低基数响应；每项初始为 not_ready，只有探测成功才改为 ready。
     checks = {
@@ -492,6 +509,7 @@ async def readiness_check(response: Response) -> ReadinessResponse:
         "return_repository": DependencyCheck(status="not_ready"),
         "outbox_repository": DependencyCheck(status="not_ready"),
         "audit_repository": DependencyCheck(status="not_ready"),
+        "knowledge_qdrant": DependencyCheck(status="not_ready"),
     }
     try:
         # aget_state 使用固定探针线程只读 Checkpoint，不创建用户业务状态。
@@ -536,6 +554,21 @@ async def readiness_check(response: Response) -> ReadinessResponse:
             "readiness 审计仓库探测失败: cause_type=%s",
             type(error).__name__,
             extra={"operation": "readiness", "failure_code": "audit_repository"},
+        )
+    try:
+        # Uvicorn 正常启动时对同一个 Qdrant Collection 执行只读元数据查询。
+        knowledge_retriever = _get_knowledge_retriever()
+        # None 仅用于 HTTPX 不触发 lifespan 的轻量测试，不代表真实部署绕过探测。
+        if knowledge_retriever is not None:
+            knowledge_retriever.health_check()
+        # 没有异常说明远程服务、鉴权和活动 Collection 均可访问。
+        checks["knowledge_qdrant"] = DependencyCheck(status="ready")
+    except Exception as error:
+        # 日志只记录异常类型和有限故障码，不暴露 Qdrant URL、密钥或响应正文。
+        logger.warning(
+            "readiness Qdrant 知识索引探测失败: cause_type=%s",
+            type(error).__name__,
+            extra={"operation": "readiness", "failure_code": "knowledge_qdrant"},
         )
 
     # 只有所有必需依赖均为 ready 才接收 Agent 流量。

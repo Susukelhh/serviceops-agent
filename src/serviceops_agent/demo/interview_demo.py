@@ -215,7 +215,7 @@ def prepare_interview_demo(
     if build_image:
         # --build 放在 up 参数后，与用户前面已经验证过的手工命令保持一致。
         compose_up_command.append("--build")
-    # --wait 只有四个长期容器健康、迁移任务成功退出后才返回 0。
+    # --wait 只有网关、双 Agent、PostgreSQL、Qdrant 健康且迁移成功退出后才返回 0。
     compose_up_command.extend(["--wait", "--wait-timeout", "180"])
     _run_step(
         label="2/4 启动并等待本地演示环境",

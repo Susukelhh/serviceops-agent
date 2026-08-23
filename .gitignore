@@ -34,3 +34,10 @@ Thumbs.db
 
 # 不上传个人简历材料
 career/resume/
+
+# Sphinx 本地构建产物可以随时由源文档重新生成，不提交到 Git。
+docs/readthedocs-guide/_build/
+
+# 外部面经参考资料只在本机学习，不属于本项目源代码，也可能包含第三方示例配置。
+ai-agent-interview-guide-main/
+ai-agent-interview-guide-main.lnk

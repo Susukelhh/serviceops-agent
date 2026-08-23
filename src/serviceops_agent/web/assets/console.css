@@ -1487,6 +1487,83 @@ button:disabled {
   font-size: 10px;
 }
 
+/* 混合召回解释卡横跨详情区，避免候选排名被压缩成狭窄 JSON 文本。 */
+.debug-data-workspace .retrieval-explain-card {
+  grid-column: 1 / -1;
+}
+
+/* 候选列表使用小间距纵向排列，适合在大屏教学模式逐项比较。 */
+.retrieval-candidate-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 11px;
+}
+
+/* 单个候选用淡色边界与其他 State 字段层级区分。 */
+.retrieval-candidate {
+  padding: 11px;
+  border: 1px solid #dfe8e3;
+  border-radius: 9px;
+  background: #f8fbf9;
+}
+
+/* 标题与最终融合分数保持在同一行，窄屏时允许自然换行。 */
+.retrieval-candidate-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.retrieval-candidate-heading strong {
+  font-size: 12px;
+}
+
+/* RRF 最终分数使用主绿色，强调它与余弦分数不是同一个指标。 */
+.retrieval-final-score {
+  color: #176c50;
+  font: 700 10px/1.4 ui-monospace, "Cascadia Code", monospace;
+}
+
+/* 两路名次使用标签并排展示，便于一眼识别单路和双路命中。 */
+.retrieval-rank-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rank-chip {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #7c8681;
+  background: #e9eeeb;
+  font-size: 9px;
+  font-weight: 720;
+}
+
+.rank-chip.active {
+  color: #176c50;
+  background: #dff3e9;
+}
+
+.rank-chip.active.lexical {
+  color: #805f14;
+  background: #fff0c7;
+}
+
+.rank-chip.method {
+  color: #42526b;
+  background: #e6edf7;
+}
+
+.retrieval-preview {
+  margin: 8px 0 0;
+  color: #52605a;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
 .debug-value {
   max-width: 100%;
   margin: 8px 0 0;

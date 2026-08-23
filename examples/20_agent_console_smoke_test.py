@@ -187,16 +187,16 @@ def main() -> int:
         ):
             raise RuntimeError("控制台 JavaScript 未进入最终镜像")
 
-        # readiness 响应证明页面旁边显示的四项状态来自真实持久化依赖。
+        # readiness 响应证明页面状态来自四类持久化边界和独立 Qdrant。
         ready_status, ready_body, _, _ = _request(url=f"{base_url}/ready")
         readiness = json.loads(ready_body.decode("utf-8"))
         checks = readiness.get("checks", {})
         if ready_status != 200 or readiness.get("status") != "ready":
             raise RuntimeError("Agent readiness 不是 ready")
-        if len(checks) != 4 or not all(
+        if len(checks) != 5 or not all(
             isinstance(item, dict) and item.get("status") == "ready" for item in checks.values()
         ):
-            raise RuntimeError("readiness 四个持久化边界没有全部就绪")
+            raise RuntimeError("readiness 五个关键依赖没有全部就绪")
 
         # Token 仅保存在当前 Python 变量，不打印或写入报告。
         customer_token = _build_local_token(

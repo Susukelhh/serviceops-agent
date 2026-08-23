@@ -108,7 +108,16 @@ def _safe_retrieval_hits(value: object) -> JsonValue:
                 "document_id": str(raw_chunk.get("document_id", "")),
                 "chunk_id": str(raw_chunk.get("chunk_id", "")),
                 "title": str(raw_chunk.get("title", "")),
+                # score 是最终排序分数；在 RRF 模式下不应误称为余弦相似度。
                 "score": _safe_json(hit.get("score")),
+                # 两路原始分数和排名帮助教学页面解释融合结果，不包含高维向量。
+                "dense_score": _safe_json(hit.get("dense_score")),
+                "lexical_score": _safe_json(hit.get("lexical_score")),
+                "dense_rank": _safe_json(hit.get("dense_rank")),
+                "lexical_rank": _safe_json(hit.get("lexical_rank")),
+                # retrieval_channels 与 fusion_method 都是领域 Schema 限定的有限值。
+                "retrieval_channels": _safe_json(hit.get("retrieval_channels", [])),
+                "fusion_method": _safe_json(hit.get("fusion_method")),
                 "content_preview": content,
             }
         )
@@ -218,9 +227,11 @@ DEBUG_FIELD_POLICIES: dict[str, DebugFieldPolicy] = {
     "has_sufficient_evidence": DebugFieldPolicy(
         "证据充足", "retrieval", "检索节点是否允许进入回答节点。"
     ),
-    "retrieval_score": DebugFieldPolicy("最高检索分数", "retrieval", "当前查询的最高余弦相似度。"),
+    "retrieval_score": DebugFieldPolicy(
+        "最高检索分数", "retrieval", "当前模式的最高最终排序分数；RRF 模式不是余弦值。"
+    ),
     "retrieval_hits": DebugFieldPolicy(
-        "检索候选", "retrieval", "通过治理后的候选、分数与证据预览。", _safe_retrieval_hits
+        "检索候选", "retrieval", "候选、双路名次、融合分数与证据预览。", _safe_retrieval_hits
     ),
     "citations": DebugFieldPolicy("引用", "retrieval", "回答节点最终采用的公开知识来源。"),
     "faq_answer_grounded": DebugFieldPolicy(

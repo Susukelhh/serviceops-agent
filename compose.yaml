@@ -14,8 +14,12 @@ x-agent-environment: &agent-environment
   # 哈希向量与抽取式回答让本地 RAG 不依赖外部模型。
   SERVICEOPS_EMBEDDING_BACKEND: hash
   SERVICEOPS_RAG_GENERATION_BACKEND: extractive
-  # Qdrant 仍用于当前单次进程内的知识检索演示；业务状态统一进入 PostgreSQL。
-  SERVICEOPS_QDRANT_LOCATION: ":memory:"
+  # 两只 Agent 通过 Compose 服务名访问同一个独立 Qdrant，不再各自维护内存索引。
+  SERVICEOPS_QDRANT_URL: http://qdrant:6333
+  # v2 Collection 对应完整混合召回版本，避免误复用旧向量结构。
+  SERVICEOPS_QDRANT_COLLECTION: serviceops_knowledge_v2
+  # 启用“全库向量召回 + 全库 BM25 召回 + RRF 融合”，而非候选集合内重排。
+  SERVICEOPS_RAG_RERANKER: hybrid_rrf
   # 显式选择 PostgreSQL，禁止 API 悄悄退回 SQLite 或纯内存。
   SERVICEOPS_PERSISTENCE_BACKEND: postgres
   # postgres 是 Compose 私有网络中的服务名，不是 Windows 的 localhost。
@@ -43,12 +47,14 @@ x-agent-service: &agent-service
   # expose 只把 8000 端口告知 Compose 内部网络，不直接暴露给 Windows。
   expose:
     - "8000"
-  # API 必须等待数据库健康并且 Alembic 迁移成功，才允许启动。
+  # API 必须等待数据库、独立向量库健康并且 Alembic 迁移成功，才允许启动。
   depends_on:
     postgres:
       condition: service_healthy
     migrate:
       condition: service_completed_successfully
+    qdrant:
+      condition: service_healthy
   # 只读根文件系统限制运行中的程序修改镜像内容。
   read_only: true
   # 必要的短期临时文件只写到受限内存，不污染镜像层。
@@ -173,6 +179,36 @@ services:
     mem_limit: 512m
     cpus: 0.5
 
+  # Qdrant 是两只 Agent 共享的“语义索引室”，容器重建后向量仍保存在独立数据卷。
+  qdrant:
+    # 固定版本与镜像摘要，避免未来同名标签变化造成索引兼容性漂移。
+    image: qdrant/qdrant:v1.19.0@sha256:057ee3a8da769fe7310dd3537b4dc7583bf87a95ce8ac43c0af5a46bc580d1fc
+    # 6333 只对 Compose 私有网络开放；Windows 无法绕过 Agent API 直接查询知识库。
+    expose:
+      - "6333"
+    # Qdrant 官方数据目录挂载具名卷，实现进程外、容器外持久化。
+    volumes:
+      - serviceops-qdrant:/qdrant/storage
+    # 使用 TCP 就绪探测，不依赖镜像额外安装 curl 或 wget。
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c ':> /dev/tcp/127.0.0.1/6333'
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 12
+    # Docker Desktop 重启后恢复向量服务，人工停止时保持停止。
+    restart: unless-stopped
+    # 禁止容器进程在运行时重新获得额外 Linux 权限。
+    security_opt:
+      - no-new-privileges:true
+    # 小型演示语料限制资源即可；面试时可解释生产容量需要压测后调整。
+    mem_limit: 1g
+    cpus: 1.0
+    # 停止前留出刷盘时间，降低突然关闭导致索引恢复的成本。
+    stop_grace_period: 30s
+
   # PostgreSQL 是多个 Agent 共用的“总档案室”。
   postgres:
     # 固定主版本、补丁版本和摘要，避免无提示升级导致数据目录不兼容。
@@ -207,3 +243,5 @@ services:
 # PostgreSQL 数据卷由 Docker 管理；docker compose down 不会删除它，down -v 才会删除。
 volumes:
   serviceops-postgres:
+  # Qdrant 数据卷与 PostgreSQL 业务数据卷职责分离，删除时也可分别控制。
+  serviceops-qdrant:

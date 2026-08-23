@@ -182,19 +182,19 @@ def _query_order_once(*, base_url: str, token: str) -> ProbeResult:
 
 
 def _read_readiness(base_url: str) -> bool:
-    """确认突发结束后四个持久化边界仍然健康。"""
+    """确认突发结束后四类状态存储和独立 Qdrant 仍然健康。"""
 
     # readiness 不进入 /api/ 限流区，过载期间也可供平台判断实例状态。
     with urlopen(f"{base_url}/ready", timeout=5) as response:
         # 解析固定 JSON，并同时检查 HTTP 与顶层状态。
         payload = json.loads(response.read().decode("utf-8"))
-        # checks 必须仍是四项全部 ready，不能只判断端口还开着。
+        # checks 必须仍是五项全部 ready，不能只判断端口还开着。
         checks = payload.get("checks", {}) if isinstance(payload, dict) else {}
         return (
             response.status == 200
             and payload.get("status") == "ready"
             and isinstance(checks, dict)
-            and len(checks) == 4
+            and len(checks) == 5
             and all(
                 isinstance(item, dict) and item.get("status") == "ready"
                 for item in checks.values()
@@ -356,7 +356,7 @@ def main() -> int:
         "recovery": {
             "request_status": recovery_result.status_code,
             "instance_id": recovery_result.instance_id,
-            "readiness_four_of_four": readiness_after_burst,
+            "readiness_five_of_five": readiness_after_burst,
         },
     }
     # 创建被忽略的报告目录。
@@ -376,7 +376,7 @@ def main() -> int:
     )
     print(f"突发状态：{report['burst']['status_counts']}")
     print(f"受保护请求：{protected_count}/{burst_requests}")
-    print("恢复验证：HTTP 200，readiness 4/4")
+    print("恢复验证：HTTP 200，readiness 5/5")
     print(f"报告：{REPORT_PATH}")
     # 零退出码供 PyCharm 和未来 CI 识别成功。
     return 0
