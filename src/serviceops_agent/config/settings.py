@@ -156,7 +156,11 @@ class Settings(BaseSettings):
     # 余弦相似度低于该阈值视为无充分证据，系统会转人工而不是猜测。
     rag_score_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
     # 查询范围策略在Embedding前拒绝高置信域外和敏感请求；off只用于Baseline对照。
-    rag_query_policy: Literal["off", "deterministic_v1"] = "deterministic_v1"
+    rag_query_policy: Literal[
+        "off",
+        "deterministic_v1",
+        "deterministic_v2",
+    ] = "deterministic_v1"
     # 检索模式：off为纯向量，bm25为旧候选内重排，hybrid_rrf为完整双路召回。
     rag_reranker: Literal["off", "bm25", "hybrid_rrf"] = "hybrid_rrf"
     # BM25词面分数在“向量 + 词面”融合分数中的占比，需要由排序实验选择。

@@ -1,0 +1,106 @@
+{
+  "profile_id": "grounded-success-development-audit-v1.1",
+  "version": "1.1.0",
+  "source_dataset_sha256": "b316e79fe374e0223d1ad652d2369799a8abdc84b042e861ac8f72a7649fc8d3",
+  "sanitize_declined_citations": true,
+  "excluded_required_fact_ids": [
+    "custom_damage_photos",
+    "inspection_is_basis",
+    "provider_log_verification",
+    "usual_one_working_day"
+  ],
+  "fact_group_extensions": [
+    {
+      "fact_id": "name_alone_not_enough",
+      "group_index": 0,
+      "additional_terms": [
+        "不得"
+      ]
+    },
+    {
+      "fact_id": "missing_disclosure_requires_manual_review",
+      "group_index": 0,
+      "additional_terms": [
+        "未显著提示",
+        "无法提供用户确认记录"
+      ]
+    },
+    {
+      "fact_id": "must_not_assume_used",
+      "group_index": 1,
+      "additional_terms": [
+        "默认用户已经使用"
+      ]
+    },
+    {
+      "fact_id": "responsibility_then_remedy",
+      "group_index": 0,
+      "additional_terms": [
+        "核实确认为系统或供应商责任"
+      ]
+    },
+    {
+      "fact_id": "recalculate_by_final_result",
+      "group_index": 0,
+      "additional_terms": [
+        "最终检测认定"
+      ]
+    },
+    {
+      "fact_id": "waterproof_not_universal_free_warranty",
+      "group_index": 1,
+      "additional_terms": [
+        "不一定"
+      ]
+    },
+    {
+      "fact_id": "waterproof_not_universal_free_warranty",
+      "group_index": 2,
+      "additional_terms": [
+        "通常不属于标准免费保修范围"
+      ]
+    },
+    {
+      "fact_id": "cannot_arbitrarily_change_content",
+      "group_index": 1,
+      "additional_terms": [
+        "任意改变"
+      ]
+    },
+    {
+      "fact_id": "no_dual_promise_before_confirmation",
+      "group_index": 0,
+      "additional_terms": [
+        "尚未确认丢件"
+      ]
+    },
+    {
+      "fact_id": "submit_evidence_for_manual_review",
+      "group_index": 1,
+      "additional_terms": [
+        "链接"
+      ]
+    },
+    {
+      "fact_id": "manual_review_same_rules",
+      "group_index": 1,
+      "additional_terms": [
+        "同一价格保护规则"
+      ]
+    },
+    {
+      "fact_id": "remedy_after_loss_confirmed",
+      "group_index": 0,
+      "additional_terms": [
+        "核查确认问题"
+      ]
+    },
+    {
+      "fact_id": "custom_damage_still_after_sales",
+      "group_index": 2,
+      "additional_terms": [
+        "承担售后责任"
+      ]
+    }
+  ]
+}

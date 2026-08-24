@@ -1,0 +1,81 @@
+{
+  "experiment_id": "serviceops-grounded-answer-v3-sealed",
+  "experiment_version": "3.0.0",
+  "run_kind": "FIRST_SEALED_EVALUATION",
+  "dataset_sha256": "605a83136532d6942724660b8ed8e12f185d49f1d908e92830a6ca2cf767c95b",
+  "candidate_fingerprint": "beefd956668ad87bb40ed8923a8111ef08d4e122feec6a59f839c6ba3e314006",
+  "profile_id": "qwen-grounded-hybrid-v2-scope-v2-sealed",
+  "total_cases": 30,
+  "passed_cases": 20,
+  "grounded_answer_success_rate": 0.6666666666666666,
+  "red_line_case_ids": [],
+  "quality_gate_passed": false,
+  "quality_gate_failures": [
+    "grounded_answer_success_rate_below_threshold"
+  ],
+  "failed_cases": [
+    {
+      "case_id": "sealed3-return-current-rule-not-retired",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-custom-no-refund-before-proof",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-freight-protection-not-any-price",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-warranty-term-varies",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-liquid-no-remote-dry-guarantee",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-invoice-pending-change",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-invoice-correction-progress",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-logistics-received-no-duplicate",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-missing-parcel-shared-investigation",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed3-price-refund-relationship",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    }
+  ],
+  "contains_private_questions": false,
+  "contains_model_answers": false,
+  "contains_fact_rule_text": false
+}

@@ -1,0 +1,15 @@
+{
+  "experiment_id": "serviceops-hybrid-grounded-evaluator-integration",
+  "version": "1.0.0",
+  "evaluator_version": "hybrid-grounded-v1",
+  "mode": "REVEALED_INTEGRATION_REPLAY",
+  "deterministic_result_path": "data/evaluation/results/grounded_answer_v3_sealed_result.json",
+  "deterministic_result_sha256": "6f477868c65f32a4be53b7518b263f7ae9da71f1540a469f906aaf2e07db8248",
+  "judge_calibration_result_path": "data/evaluation/results/semantic_judge_calibration_v1_result.json",
+  "judge_calibration_result_sha256": "5f0b29646d4b1ae0acb734df02ad794e114d099ef1cb1cb666dcfba9eb62a4a4",
+  "judge_verdicts_path": "data/evaluation/results/semantic_judge_v1_original_verdicts.json",
+  "judge_verdicts_sha256": "4661b2e0b43ef358133f59f0b94f5ef910d7f4f040035e0ab58849f8e1d8e28c",
+  "min_required_judge_calibration_accuracy": 0.9,
+  "min_grounded_answer_success_rate": 0.8,
+  "frozen_evaluator_fingerprint": "df0ce285c6cb76dcefde8e538ffe5249b68a8c1389a71f3d48dcff6aa4ae5e0b"
+}

@@ -105,8 +105,44 @@
 揭晓后的人工标签审计还发现：14 道“必要事实缺失”中约 8 道确实漏了用户直接询问的核心结论，另有约
 6 道的缺失项更像背景、重复结论或可选流程说明。由于首次运行没有保存原始答案，不能据此正式重算，
 更不能把示意修正当成新指标。公开的 40% 继续作为 v1 严格口径首次结果；后续私有诊断应把失败分成
-`MODEL_OMISSION`、`MATCHER_FALSE_NEGATIVE`、`GOLD_SCOPE_TOO_STRICT` 和人工待定四类，再用新的 v2
-密封集给出未知样本结论。
+`MODEL_OMISSION`、`MATCHER_FALSE_NEGATIVE`、`GOLD_SCOPE_TOO_STRICT` 和
+`AMBIGUOUS_NEEDS_REVIEW` 四类，再用新的 v2 密封集给出未知样本结论。
+
+## 私有 REGRESSION 诊断怎么运行
+
+首次 `10/25（40%）` 是已经冻结的公开事实。私有诊断的作用只是保存足够的本机材料，帮助解释每条失败，
+**不会覆盖首次结果，也不能把同一套 v1 重新包装成新的盲测**。
+
+私有诊断只能使用下面这一组完整参数，不能省略其中任何一个：
+
+```powershell
+uv run python examples/34_grounded_answer_success_experiment.py --confirm-blind --confirm-paid-api --regression --write-private-diagnostics
+```
+
+这条命令会再次调用真实千问 Embedding 和聊天模型，因此会产生新的付费请求。它必须由项目所有者本人
+看清参数后主动运行；本项目的自动化流程和助手都不能代为执行。实际请求次数和费用以当次输出为准。
+
+私有诊断会保存问题、模型原始回答、Top-K 候选与实际引用、逐事实匹配明细等人工复核所需材料。文件固定
+写入：
+
+```text
+data/private_evaluation/diagnostics/grounded_answer_success
+```
+
+这个目录被 Git 和 Docker 构建上下文共同忽略。即使文件看起来只是 JSON，其中仍可能含有私有题目、答案
+和完整证据，**不要把它提交到 GitHub、放进镜像、粘贴到公开聊天或发送给无关人员**。
+
+人工复核时，每条失败归入下面四类之一：
+
+| 分类 | 大白话解释 | 下一步 |
+|---|---|---|
+| `MODEL_OMISSION` | 证据足够，模型答案确实漏了用户需要的关键事实 | 优化回答提示、回答结构或生成后的完整性检查 |
+| `MATCHER_FALSE_NEGATIVE` | 模型其实表达了该事实，只是换了一种说法，机械匹配器没有认出来 | 补充同义表达或改进匹配器，不改模型 |
+| `GOLD_SCOPE_TOO_STRICT` | 金标把用户没有直接询问的背景或次要说明也设成了必答项 | 修订下一版金标范围；首次40%仍不重算 |
+| `AMBIGUOUS_NEEDS_REVIEW` | 当前材料不足，或多人可能有不同判断 | 暂不改代码和金标，交给第二位人工复核 |
+
+运行结束后，用户只需回复“运行完成”。项目文件就在同一台电脑上，可以继续从上述私有目录读取并分析；
+不需要把诊断 JSON 复制到聊天中，更不需要公开上传。
 
 ## 在 PyCharm 中运行
 
@@ -122,18 +158,21 @@
 |---|---|---|
 | 1. 安全预检 | 留空 | 只展示题量、SHA、候选指纹和费用计划；不读取私有题目，不调用千问 |
 | 2. 零费用密封集对照 | `--confirm-blind` | 校验并读取密封集，运行 Hash + BM25 + RRF + Extractive 对照；不调用千问 |
-| 3. 首次真实冻结候选 | `--confirm-blind --confirm-paid-api` | 使用已冻结候选调用真实千问 Embedding 和 `qwen-plus`，产生费用并保存首次脱敏结果 |
+| 3. 历史首次真实候选 | `--confirm-blind --confirm-paid-api` | 首次结果已存在；保留该行用于解释历史运行方式，不应再把复跑称为首次盲测 |
+| 4. 私有回归诊断 | `--confirm-blind --confirm-paid-api --regression --write-private-diagnostics` | 再次产生付费请求；保存仅供本机人工复核的详细诊断，不覆盖首次结果 |
 
 第三种模式要求本机 `.env` 已正确配置千问 Key 和地域匹配的 Base URL。脚本预估最多 4 次 Embedding 请求、
 25 次聊天调用；最终以实际报告为准。
 
-首次真实结果已经存在后，同一题集只能明确标记为回归复跑：
+首次真实结果已经存在后，普通回归复跑至少要明确标记：
 
 ```text
 --confirm-blind --confirm-paid-api --regression
 ```
 
 回归模式不会覆盖首次冻结结果，也不能再称为一次新的盲测。
+如果需要写出包含原始回答和证据的私有诊断，则必须再加
+`--write-private-diagnostics`，即使用表格第 4 行的完整参数。该开关不能单独使用。
 
 ## 怎样解释结果
 
@@ -153,5 +192,6 @@
 - 运行入口：`examples/34_grounded_answer_success_experiment.py`
 - 评测实现：`src/serviceops_agent/evaluation/grounded_answer_success_experiment.py`
 - 本机报告：`data/runtime/grounded_answer_success_report.json`（不提交 Git）
+- 私有回归诊断：`data/private_evaluation/diagnostics/grounded_answer_success`（不提交 Git/Docker，不公开上传）
 - 离线风险对照：`data/evaluation/results/grounded_answer_success_v1_offline_baseline.json`
 - 首次公开证据：`data/evaluation/results/grounded_answer_success_v1_frozen_result.json`（10/25，Gate FAIL）

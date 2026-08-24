@@ -366,6 +366,13 @@ uv run python examples/31_hybrid_retrieval_experiment.py
 硬门，因此40%是v1严格口径而非模型通用正确率；首次结果仍原样保留，不事后改分。详见
 [`docs/steps/34-end-to-end-grounded-answer-success-rate.md`](docs/steps/34-end-to-end-grounded-answer-success-rate.md)。
 
+首次40%的冻结结果不会被后续诊断覆盖。若要保存问题、模型原始回答、实际引用切片和逐事实匹配明细，
+只能运行带有明确回归标记的私有诊断。它会再次调用千问并产生费用，所以必须由项目所有者本人确认后
+运行，不能由自动脚本或助手代为触发。诊断文件只写入
+`data/private_evaluation/diagnostics/grounded_answer_success`，不会进入Git或Docker；其中可能包含私有题目
+和原始回答，禁止公开上传。人工复核时将失败原因归入 `MODEL_OMISSION`、
+`MATCHER_FALSE_NEGATIVE`、`GOLD_SCOPE_TOO_STRICT` 或 `AMBIGUOUS_NEEDS_REVIEW`，而不是事后修改首次分数。
+
 ```powershell
 # 仅预检：不读取私有题目，不调用千问
 uv run python examples/34_grounded_answer_success_experiment.py
@@ -373,9 +380,63 @@ uv run python examples/34_grounded_answer_success_experiment.py
 # 零费用读取密封集并运行离线风险对照
 uv run python examples/34_grounded_answer_success_experiment.py --confirm-blind
 
-# 首次真实冻结候选：会调用千问并产生费用
+# 历史首次真实候选（冻结结果已经存在，不应再次作为“首次”运行）
 uv run python examples/34_grounded_answer_success_experiment.py --confirm-blind --confirm-paid-api
+
+# 私有REGRESSION诊断：会再次调用千问并产生费用，只能由项目所有者本人运行
+uv run python examples/34_grounded_answer_success_experiment.py --confirm-blind --confirm-paid-api --regression --write-private-diagnostics
 ```
+
+第35步没有修改第34步首次40%结果，而是把“模型真的答错”和“评测器误判”拆开。私有诊断人工审计后，
+`grounded-success-development-audit-v1.1`直接重放原v1回答，不再调用千问，得到20/25（80%）；但仍有
+1条知识缺口自动回答红线，所以Gate继续FAIL。旧Prompt和候选指纹保持不变，新Prompt v2使用独立指纹，
+只针对多子问题覆盖、必要条件/可能性表达和近域政策类推进行通用约束。真实Prompt v2开发回归仍为
+20/25（80%），但红线从1条降为0条并通过开发Gate；逐题对比显示它修好3题、退化3题，而剩余5题中
+还有1条评分器同义表达漏判和1条金标范围过严。该25题已经揭晓，所有结果只能称为开发回归，真正晋级
+仍需要全新v2密封集。脱敏证据保存在
+[`data/evaluation/results/grounded_answer_v2_development_result.json`](data/evaluation/results/grounded_answer_v2_development_result.json)，详见
+[`docs/steps/35-grounded-answer-v2-development.md`](docs/steps/35-grounded-answer-v2-development.md)。
+
+```powershell
+# 零费用：重放已经保存的v1回答，验证v1.1开发评分器
+uv run python examples/35_grounded_answer_v2_development.py --confirm-revealed-regression --replay-latest-v1-diagnostic
+
+# 真实Prompt v2开发候选：约4次Embedding、最多25次聊天调用，会产生费用
+uv run python examples/35_grounded_answer_v2_development.py --confirm-revealed-regression --confirm-paid-api --write-private-diagnostics
+```
+
+第36步冻结一套从未参与Prompt调试的30题密封集（20道有据问题、10道知识缺口），用于验证Prompt v2是否
+真正泛化。题目正文只保存在Git与Docker忽略的本机目录；公开配置冻结数量、SHA、候选和80%+零红线质量门。
+零费用 `Hash + BM25 + RRF + Extractive` 对照只有14/30，并对10道知识缺口全部强答，说明这不是一个靠
+复制证据就能刷满分的简单测试。详见
+[`docs/steps/36-grounded-answer-v2-sealed-evaluation.md`](docs/steps/36-grounded-answer-v2-sealed-evaluation.md)。
+
+```powershell
+# 默认计划：不读取密封题、不读取Key、费用0元
+uv run python examples/36_grounded_answer_v2_sealed.py
+
+# 零费用离线风险对照（已经完成）
+uv run python examples/36_grounded_answer_v2_sealed.py --confirm-sealed
+
+# 一次性真实Prompt v2盲测：约4次Embedding、最多30次聊天调用
+uv run python examples/36_grounded_answer_v2_sealed.py --confirm-sealed --confirm-paid-api
+```
+
+第36步首次真实结果为13/30（43.33%）、2条红线、Gate FAIL：20道有据题仅完整通过6道，10道知识缺口
+正确拒答7道。它证明第35步已揭晓开发集上的0红线没有泛化，Prompt v2当前不能晋级生产。首次结果保留在
+[`data/evaluation/results/grounded_answer_v2_sealed_result.json`](data/evaluation/results/grounded_answer_v2_sealed_result.json)，
+后续同题运行只能作为REGRESSION；修复后的未知验证必须建立新的v3密封集。
+
+同题私有REGRESSION自动评分为15/30，但逐题人工语义审计发现，15道自动失败中有14道来自短语匹配
+漏判、金标范围过严、生产最终状态不一致或知识缺口标签错误；真实剩余系统错误是范围门把安全咨询误拦。
+人工审计为29/30，但它既不是自动Gate也不是新盲测，不能覆盖首次13/30。脱敏审计证据保存在
+[`data/evaluation/results/grounded_answer_v2_sealed_regression_audit.json`](data/evaluation/results/grounded_answer_v2_sealed_regression_audit.json)。
+
+第37步据此没有继续调Prompt，而是新增版本化范围门v2：允许“客服能否索要密码/验证码”的公开安全咨询，
+同时继续拦截“验证码是多少”等真实凭据索取；另增加 `sanitize_declined_citations` 实验开关，使未来评测按
+生产FAQ最终可见状态处理拒答引用。历史范围门v1、旧配置和已发布指纹保持不变，生产默认暂不切换，必须
+通过下一套新密封集后才能晋级。详见
+[`docs/steps/37-evaluator-audit-and-scope-v2.md`](docs/steps/37-evaluator-audit-and-scope-v2.md)。
 
 运行两个订单的可控工具循环与最大步数安全停止演示：
 
@@ -689,6 +750,33 @@ uv run python examples/33_public_demo_end_to_end_blind_test.py
 
 ## 下一步
 
+第37步通过私有诊断确认第36步自动低分主要来自机械匹配、金标范围和最终状态口径，而真正系统错误是范围门
+把安全咨询误判为索取凭据。第38步因此保持Prompt v2、Embedding、切片与混合召回参数不变，只冻结范围门
+`deterministic_v2`和拒答引用最终状态评分，并建立30道全新密封题（20正例、10知识缺口）。揭晓前题集SHA、
+候选指纹和80%零红线质量门已写死；离线对照为16/30（53.33%）。首次千问密封结果为20/30
+（66.67%），10道知识缺口全部正确拒答且红线为0，但20道有答案题只有10道完整通过，因此Gate如实FAIL。
+范围门v2修复已被未知安全咨询题验证。随后已揭晓私有回归再次得到相同20/30；逐题人工审计确认8题是机械
+语义匹配漏判、2题是金标范围过严、0题是真实模型漏答。人工语义复核30/30不能冒充新盲测，正式结果仍保留
+66.67% FAIL；该证据支持改评测器而不是继续调Prompt。
+完整纪律与PyCharm参数见
+[`docs/steps/38-grounded-answer-v3-sealed.md`](docs/steps/38-grounded-answer-v3-sealed.md)。
+
+第39步针对上述评测器短板实现“确定性红线 + 语义完整性Judge”：安全错误仍由规则零容忍否决，只有答案
+完整性争议交给结构化Judge。校准集由10条人工确认正确的原答案和10条固定不完整反例组成，防止Judge靠
+全部判PASS刷分；唯一指标是与人工标签的一致率，90%门槛和Judge指纹已在真实调用前冻结。本步复用已保存
+答案，Embedding和Agent生成均为0，只计划20次Judge调用。详见
+[`docs/steps/39-semantic-judge-calibration.md`](docs/steps/39-semantic-judge-calibration.md)。
+
+首次真实 `qwen-plus` Judge校准与人工标签一致20/20：10条正确原答案全部通过、10条不完整反例全部拒绝，
+通过预设90%门，且没有额外Embedding或Agent生成。该100%只表示Judge校准一致率，不能替代第38步Agent
+正式盲测20/30（66.67% FAIL），也不能把已揭晓人工复核30/30宣传成新盲测。
+
+第40步完成Judge的分层接入：确定性规则拥有不可覆盖的安全优先级，只有唯一失败为
+`required_fact_missing`时才允许语义复核；Judge的FAIL、NEEDS_REVIEW或缺失结论全部失败关闭。零费用已揭晓
+集成回放把10条纯完整性争议合法升级到30/30，但明确标记为 `REVEALED_INTEGRATION_REPLAY`，只验证集成逻辑，
+不替换第38步正式66.67%。详见
+[`docs/steps/40-hybrid-grounded-evaluator-integration.md`](docs/steps/40-hybrid-grounded-evaluator-integration.md)。
+
 第34步的公开契约、事实级评分器和密封题集已经完成。零费用 Hash + BM25 + RRF + Extractive 对照在
 25题上严格通过14题，有据回答成功率56%；6条知识缺口全部被相似资料带偏并自动作答，另有5条可回答题
 缺少必要事实，因此质量门FAIL。首次千问候选严格通过10/25（40%）：正确拒答5/6，但可回答题完整通过
@@ -696,6 +784,12 @@ uv run python examples/33_public_demo_end_to_end_blind_test.py
 原样冻结；v1从现在起只能作为回归集。后续先用本地私有诊断区分“真实漏答”和“同义表达未命中”，修复后
 还要识别“金标范围过严”。现有脱敏报告没有保存原始答案，不能正式重算；必须用新的v2密封集验证，
 不能在同一批题上反复调到100%后继续称为盲测。
+
+私有诊断要求同时提供
+`--confirm-blind --confirm-paid-api --regression --write-private-diagnostics`，会再次产生真实模型费用，不能由
+助手自动运行。输出固定留在 `data/private_evaluation/diagnostics/grounded_answer_success`，不会进入Git或
+Docker，也不应上传到公开仓库。用户运行后只需回复“运行完成”，即可继续在本机分析，不必复制或公开
+其中的私有内容；无论诊断结论如何，首次10/25（40%）冻结证据都保持不变。
 
 核心 Agent 工程链路到第 23 步已经闭环：模型/检索/工具/人工审批、评测、鉴权、审计、可观测、
 Outbox、容器、PostgreSQL、Schema Migration、双实例故障切换、过载恢复和可验证数据库备份都有代码

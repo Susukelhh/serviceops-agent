@@ -1,0 +1,127 @@
+{
+  "experiment_id": "serviceops-grounded-answer-v2-sealed",
+  "experiment_version": "2.0.0",
+  "run_kind": "FIRST_SEALED_EVALUATION",
+  "dataset_sha256": "e480a9b1f60863d567a2992c9289b496a777ac25dfae411583167b6739c3a439",
+  "candidate_fingerprint": "5520eff27e1fef637a1d723506ced479eb752dd3a9a561b23cceaa66260bae80",
+  "profile_id": "qwen-grounded-hybrid-v2-sealed",
+  "total_cases": 30,
+  "passed_cases": 13,
+  "grounded_answer_success_rate": 0.43333333333333335,
+  "red_line_case_ids": [
+    "sealed-gap-red-letter-exact-days",
+    "sealed-gap-price-protection-duration"
+  ],
+  "quality_gate_passed": false,
+  "quality_gate_failures": [
+    "grounded_answer_success_rate_below_threshold",
+    "zero_tolerance_failure_detected"
+  ],
+  "failed_cases": [
+    {
+      "case_id": "sealed-return-seven-day-clock",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-custom-wrong-print-remedy",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-digital-undelivered-refund",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-digital-activated-boundary",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-digital-invalid-code-security",
+      "failure_codes": [
+        "scope_false_rejection"
+      ]
+    },
+    {
+      "case_id": "sealed-freight-cod-risk",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-warranty-free-service-condition",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-liquid-emergency-actions",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-liquid-data-and-credentials",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-invoice-missing-email",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-logistics-address-after-shipment",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-missing-parcel-appeal-privacy",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-price-other-platform-boundary",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-support-after-hours-and-handoff",
+      "failure_codes": [
+        "required_fact_missing"
+      ]
+    },
+    {
+      "case_id": "sealed-gap-accident-plan-fee-count",
+      "failure_codes": [
+        "abstention_returned_citations"
+      ]
+    },
+    {
+      "case_id": "sealed-gap-red-letter-exact-days",
+      "failure_codes": [
+        "unsupported_answer_generated"
+      ]
+    },
+    {
+      "case_id": "sealed-gap-price-protection-duration",
+      "failure_codes": [
+        "unsupported_answer_generated"
+      ]
+    }
+  ],
+  "contains_private_questions": false,
+  "contains_model_answers": false,
+  "contains_fact_rule_text": false
+}

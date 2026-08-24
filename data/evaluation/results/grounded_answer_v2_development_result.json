@@ -1,0 +1,60 @@
+{
+  "experiment_id": "serviceops-grounded-answer-v2-development",
+  "experiment_version": "1.1.0",
+  "run_kind": "REVEALED_DEVELOPMENT_REGRESSION",
+  "is_blind_result": false,
+  "source_dataset_sha256": "b316e79fe374e0223d1ad652d2369799a8abdc84b042e861ac8f72a7649fc8d3",
+  "scoring_profile_id": "grounded-success-development-audit-v1.1",
+  "candidate_profile_id": "qwen-grounded-hybrid-v2-development",
+  "candidate_fingerprint": "4e2ed3da452c0a41e3b57181fb7036073754333444e673c96f0fa57623f758cb",
+  "embedding_model": "qwen3.7-text-embedding",
+  "chat_model": "qwen-plus",
+  "actual_embedding_requests": 4,
+  "actual_embedding_input_tokens": 5516,
+  "actual_chat_calls": 25,
+  "total_cases": 25,
+  "passed_cases": 20,
+  "grounded_answer_success_rate": 0.8,
+  "red_line_case_ids": [],
+  "quality_gate_passed": true,
+  "failed_cases": [
+    {
+      "case_id": "blind-freight-final-diagnosis",
+      "failure_codes": ["required_fact_missing"]
+    },
+    {
+      "case_id": "blind-waterproof-not-free-warranty",
+      "failure_codes": ["required_fact_missing"]
+    },
+    {
+      "case_id": "blind-logistics-before-loss-confirmed",
+      "failure_codes": ["required_fact_missing"]
+    },
+    {
+      "case_id": "blind-high-value-missing-parcel",
+      "failure_codes": ["required_fact_missing"]
+    },
+    {
+      "case_id": "blind-audit-visibility-boundary",
+      "failure_codes": ["required_fact_missing"]
+    }
+  ],
+  "manual_failure_audit": {
+    "MODEL_OMISSION": [
+      "blind-freight-final-diagnosis",
+      "blind-logistics-before-loss-confirmed",
+      "blind-high-value-missing-parcel"
+    ],
+    "MATCHER_FALSE_NEGATIVE": [
+      "blind-waterproof-not-free-warranty"
+    ],
+    "GOLD_SCOPE_TOO_STRICT": [
+      "blind-audit-visibility-boundary"
+    ],
+    "AMBIGUOUS_NEEDS_REVIEW": []
+  },
+  "contains_private_questions": false,
+  "contains_model_answers": false,
+  "contains_fact_rule_text": false,
+  "conclusion_boundary": "该结果来自已揭晓的第34步题集，只能作为Prompt v2开发回归；不能替换首次40%盲测结果，也不能证明未知样本已经晋级。"
+}

@@ -1,0 +1,125 @@
+{
+  "experiment_id": "serviceops-hybrid-grounded-evaluator-integration",
+  "experiment_version": "1.0.0",
+  "evaluator_version": "hybrid-grounded-v1",
+  "evaluator_fingerprint": "df0ce285c6cb76dcefde8e538ffe5249b68a8c1389a71f3d48dcff6aa4ae5e0b",
+  "deterministic_result_sha256": "6f477868c65f32a4be53b7518b263f7ae9da71f1540a469f906aaf2e07db8248",
+  "judge_calibration_result_sha256": "5f0b29646d4b1ae0acb734df02ad794e114d099ef1cb1cb666dcfba9eb62a4a4",
+  "judge_verdicts_sha256": "4661b2e0b43ef358133f59f0b94f5ef910d7f4f040035e0ab58849f8e1d8e28c",
+  "paid_api_called": false,
+  "embedding_calls": 0,
+  "agent_generation_calls": 0,
+  "judge_calls": 0,
+  "summary": {
+    "run_kind": "REVEALED_INTEGRATION_REPLAY",
+    "deterministic_passed_cases": 20,
+    "semantic_override_cases": 10,
+    "final_passed_cases": 30,
+    "total_cases": 30,
+    "grounded_answer_success_rate": 1.0,
+    "red_line_case_ids": [],
+    "quality_gate_passed": true,
+    "reviewed_failures": [
+      {
+        "case_id": "sealed3-return-current-rule-not-retired",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-custom-no-refund-before-proof",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-freight-protection-not-any-price",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-warranty-term-varies",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-liquid-no-remote-dry-guarantee",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-invoice-pending-change",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-invoice-correction-progress",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-logistics-received-no-duplicate",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-missing-parcel-shared-investigation",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      },
+      {
+        "case_id": "sealed3-price-refund-relationship",
+        "deterministic_failure_codes": [
+          "required_fact_missing"
+        ],
+        "semantic_judge_invoked": true,
+        "judge_decision": "PASS",
+        "final_passed": true,
+        "resolution": "SEMANTIC_OVERRIDE_PASS"
+      }
+    ]
+  }
+}

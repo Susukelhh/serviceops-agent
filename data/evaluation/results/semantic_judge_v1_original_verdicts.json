@@ -1,0 +1,64 @@
+{
+  "schema_version": "semantic-judge-original-verdicts-v1",
+  "run_kind": "REVEALED_CALIBRATION_OUTPUT",
+  "source_calibration_result_sha256": "5f0b29646d4b1ae0acb734df02ad794e114d099ef1cb1cb666dcfba9eb62a4a4",
+  "judge_fingerprint": "d2c395db0d47b3b59cfe86a35c9f02dede0dae5dab53eee8ee69850efddff160",
+  "verdicts": [
+    {
+      "case_id": "sealed3-return-current-rule-not-retired",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-custom-no-refund-before-proof",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-freight-protection-not-any-price",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-liquid-no-remote-dry-guarantee",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-invoice-pending-change",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-invoice-correction-progress",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-logistics-received-no-duplicate",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-price-refund-relationship",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-warranty-term-varies",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    },
+    {
+      "case_id": "sealed3-missing-parcel-shared-investigation",
+      "decision": "PASS",
+      "reason_code": "complete_and_supported"
+    }
+  ],
+  "privacy": {
+    "contains_private_questions": false,
+    "contains_agent_answers": false,
+    "contains_evidence_text": false,
+    "contains_judge_reason_text": false
+  }
+}

@@ -67,8 +67,10 @@ def test_resume_metrics_match_versioned_project_evidence() -> None:
     assert "每轮 13/13" in resume
     assert "小型黄金集" in resume
     # 当前完整门禁数字可以写，但必须明确它是本地测试结果。
-    # 加入一次性知识索引任务契约后，本地完整测试总数更新为203。
-    assert "当前本地测试为 203 passed、2 skipped" in resume
+    # 加入密封盲测、Judge 校准与混合评测器后，本地完整测试总数更新为277。
+    assert "当前本地质量门为 277 passed、2 skipped" in resume
+    # 揭晓后的回放结果不得覆盖首次密封盲测，避免把评测器修复包装成模型提升。
+    assert "保留正式盲测 66.67%" in resume
     # 证据地图必须明确禁止把小样本结果外推为永久或线上 100%。
     assert "不能说“Agent 准确率永久 100%”" in evidence
     assert "不外推线上准确率" in evidence

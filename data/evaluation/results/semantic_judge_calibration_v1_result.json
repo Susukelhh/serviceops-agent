@@ -1,0 +1,17 @@
+{
+  "experiment_id": "serviceops-semantic-judge-calibration",
+  "experiment_version": "1.0.0",
+  "run_kind": "FIRST_SEMANTIC_JUDGE_CALIBRATION",
+  "source_diagnostic_sha256": "e45be102a01529fed595ba825551f0ada8706aa41dc49580eb983c972f5e020e",
+  "judge_fingerprint": "d2c395db0d47b3b59cfe86a35c9f02dede0dae5dab53eee8ee69850efddff160",
+  "profile_id": "qwen-plus-semantic-judge-v1",
+  "total_items": 20,
+  "matched_items": 20,
+  "calibration_accuracy": 1.0,
+  "quality_gate_passed": true,
+  "mismatched_items": [],
+  "contains_private_questions": false,
+  "contains_agent_answers": false,
+  "contains_evidence_text": false,
+  "contains_judge_reason_text": false
+}

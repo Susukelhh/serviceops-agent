@@ -1,5 +1,11 @@
 """验证第34步事实级端到端成功率、盲测隔离、费用边界和报告脱敏。"""
 
+# argparse用于直接构造第34步CLI的四个布尔开关组合。
+import argparse
+
+# importlib.util用于安全加载文件名以数字开头、无法普通import的example脚本。
+import importlib.util
+
 # json用于检查送入回答器的公开输入和最终报告中是否混入事实金标。
 import json
 
@@ -8,6 +14,9 @@ from datetime import date
 
 # Path用于拦截私有盲测文件读取，并声明稳定配置位置。
 from pathlib import Path
+
+# ModuleType为动态加载的第34步CLI模块提供明确类型。
+from types import ModuleType
 
 # pytest提供异步测试、异常断言和临时方法替换。
 import pytest
@@ -31,6 +40,8 @@ from serviceops_agent.evaluation import (
     GroundedAnswerSuccessCase,
     GroundedAnswerSuccessExperimentConfig,
     GroundedAnswerSuccessExperimentReport,
+    GroundedAnswerSuccessSummary,
+    PrivateGroundedAnswerDiagnosticCollector,
     RequiredFactRule,
     evaluate_grounded_answer_success,
     grounded_answer_candidate_fingerprint,
@@ -38,6 +49,12 @@ from serviceops_agent.evaluation import (
     load_private_grounded_answer_cases,
     run_grounded_answer_success_experiment,
     validate_grounded_answer_evidence_labels,
+    write_private_grounded_answer_diagnostics,
+)
+
+# 导入实现模块只用于把固定私有目录重定向到pytest临时目录，绝不触碰真实盲测目录。
+from serviceops_agent.evaluation import (
+    grounded_answer_success_experiment as grounded_success_module,
 )
 
 # 完全放行策略让单元测试只关注事实与引用评分，不受范围关键词影响。
@@ -47,6 +64,76 @@ from serviceops_agent.rag.query_policy import AllowAllKnowledgeQueryPolicy
 CONFIG_PATH: Path = (
     PROJECT_ROOT / "data/evaluation/grounded_answer_success_experiment.json"
 )
+
+
+def _load_step34_cli_module() -> ModuleType:
+    """通过文件路径加载第34步脚本，避免数字文件名破坏普通import语法。"""
+
+    # example脚本只在导入阶段声明函数；__main__保护保证不会真正执行实验。
+    script_path = PROJECT_ROOT / "examples/34_grounded_answer_success_experiment.py"
+    # 使用稳定但独立的测试模块名，不污染业务包命名空间。
+    spec = importlib.util.spec_from_file_location(
+        "serviceops_step34_cli_for_unit_tests",
+        script_path,
+    )
+    # 缺少spec或loader说明仓库文件损坏，应给出清楚的测试失败而不是AttributeError。
+    if spec is None or spec.loader is None:
+        raise AssertionError("无法加载第34步CLI脚本")
+    # 按Python标准导入流程创建空模块对象。
+    module = importlib.util.module_from_spec(spec)
+    # 只执行函数和常量定义，不会进入脚本末尾的main分支。
+    spec.loader.exec_module(module)
+    # 返回模块后，测试可以直接验证内部安全边界函数。
+    return module
+
+
+def _minimal_summary(*, profile_id: str) -> GroundedAnswerSuccessSummary:
+    """创建只用于首次冻结写盘测试的最小脱敏汇总。"""
+
+    # 首次冻结writer只读取聚合字段；空results避免引入任何问题或答案正文。
+    return GroundedAnswerSuccessSummary(
+        profile_id=profile_id,
+        total_cases=2,
+        answerable_cases=1,
+        unanswerable_cases=1,
+        passed_cases=1,
+        grounded_answer_success_rate=0.5,
+        red_line_case_ids=[],
+        quality_gate_passed=False,
+        quality_gate_failures=["grounded_answer_success_rate_below_threshold"],
+        grounding_chat_calls=2,
+        results=[],
+    )
+
+
+def _install_short_writer_uuid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """给Windows长临时目录安装短且唯一的测试UUID，避免触发MAX_PATH。"""
+
+    # Windows CI的pytest临时根较长，而生产UUID文件名会再叠加两次形成partial名。
+    next_value = 0
+
+    class _ShortUniqueId:
+        """同时提供uuid对象的字符串形式和hex属性。"""
+
+        def __init__(self, value: str) -> None:
+            """保存当前测试进程内不会重复的短值。"""
+
+            self.hex = value
+
+        def __str__(self) -> str:
+            """writer构造最终文件名时返回同一个短值。"""
+
+            return self.hex
+
+    def short_uuid4() -> _ShortUniqueId:
+        """每次调用递增，仍然保留“不同回归不覆盖”的测试语义。"""
+
+        nonlocal next_value
+        next_value += 1
+        return _ShortUniqueId(f"u{next_value}")
+
+    # 只替换评测实现模块中的uuid4引用，不改变Python全局uuid行为。
+    monkeypatch.setattr(grounded_success_module, "uuid4", short_uuid4)
 
 
 def _hit(
@@ -756,3 +843,495 @@ def test_evidence_label_preflight_uses_real_frozen_chunks_before_blind_reveal() 
     # 错误只公开稳定Case/Fact ID，不打印问题或事实正文。
     with pytest.raises(ValueError, match="label-preflight-invalid:invoice-real-evidence"):
         validate_grounded_answer_evidence_labels(config, [invalid_case])
+
+
+def test_cli_argument_contract_covers_every_switch_and_frozen_result_state() -> None:
+    """四个CLI开关与首次结果存在性共32种组合都必须遵守同一状态机。"""
+
+    # 动态加载example脚本只取得参数校验函数，不启动事件循环或真实实验。
+    cli_module = _load_step34_cli_module()
+    # 两种首次结果状态乘以四个布尔开关，完整覆盖全部32种组合。
+    for frozen_result_exists in (False, True):
+        for confirm_blind in (False, True):
+            for confirm_paid_api in (False, True):
+                for regression in (False, True):
+                    for write_private_diagnostics in (False, True):
+                        # Namespace与argparse真实返回对象字段完全一致。
+                        args = argparse.Namespace(
+                            confirm_blind=confirm_blind,
+                            confirm_paid_api=confirm_paid_api,
+                            regression=regression,
+                            write_private_diagnostics=write_private_diagnostics,
+                        )
+                        # 只有满足五条契约的组合才能继续读取配置、.env或私有题。
+                        expected_valid = (
+                            not (confirm_paid_api and not confirm_blind)
+                            and not (regression and not confirm_paid_api)
+                            and not (regression and not frozen_result_exists)
+                            and not (
+                                write_private_diagnostics
+                                and not (
+                                    confirm_blind
+                                    and confirm_paid_api
+                                    and regression
+                                )
+                            )
+                            and not (
+                                confirm_paid_api
+                                and frozen_result_exists
+                                and not regression
+                            )
+                        )
+                        # 合法组合应静默通过，且不需要访问真实冻结文件。
+                        if expected_valid:
+                            cli_module._validate_argument_contract(
+                                args,
+                                frozen_result_exists=frozen_result_exists,
+                            )
+                        else:
+                            # 非法组合统一在最外层快速失败，不进入任何有费用路径。
+                            with pytest.raises(ValueError):
+                                cli_module._validate_argument_contract(
+                                    args,
+                                    frozen_result_exists=frozen_result_exists,
+                                )
+
+
+def test_first_frozen_result_is_created_once_and_never_overwritten(
+    tmp_path: Path,
+) -> None:
+    """首次公开结果必须使用独占发布，第二次写入不能改变一个字节。"""
+
+    # 动态脚本中的target_path测试接口让验证完全落在pytest临时目录。
+    cli_module = _load_step34_cli_module()
+    target_path = tmp_path / "frozen-result.json"
+    # 第一次写入使用候选A的聚合结果。
+    cli_module._write_public_frozen_result(
+        _minimal_summary(profile_id="candidate-first"),
+        experiment_id="experiment-first",
+        experiment_version="1.0.0",
+        dataset_sha256="a" * 64,
+        candidate_fingerprint="b" * 64,
+        target_path=target_path,
+    )
+    # 保存原始字节作为不可变历史证据。
+    first_bytes = target_path.read_bytes()
+    # 第二次即使内容和候选身份不同，也必须由操作系统独占语义拒绝。
+    with pytest.raises(FileExistsError):
+        cli_module._write_public_frozen_result(
+            _minimal_summary(profile_id="candidate-second"),
+            experiment_id="experiment-second",
+            experiment_version="9.9.9",
+            dataset_sha256="c" * 64,
+            candidate_fingerprint="d" * 64,
+            target_path=target_path,
+        )
+    # 写入失败后首次结果逐字节保持不变。
+    assert target_path.read_bytes() == first_bytes
+    # 同目录不允许残留可能包含半份结果的partial临时文件。
+    assert list(tmp_path.glob("*.partial")) == []
+    assert list(tmp_path.glob(".*.partial")) == []
+
+
+def test_regression_snapshot_detects_change_and_deletion(tmp_path: Path) -> None:
+    """回归前后快照既接受完全未变文件，也能发现覆盖、触碰和删除。"""
+
+    # 快照函数来自CLI保护层，不读取或解析任何真实实验结果。
+    cli_module = _load_step34_cli_module()
+    frozen_path = tmp_path / "frozen-result.json"
+    frozen_path.write_text('{"result":"first"}\n', encoding="utf-8")
+    # 首次读取同时冻结SHA、字节数和纳秒修改时间。
+    snapshot = cli_module._snapshot_frozen_result(frozen_path)
+    # 未做任何修改时必须通过，避免把正常回归误判为破坏历史。
+    cli_module._assert_frozen_result_unchanged(frozen_path, snapshot)
+    # 即使文件仍是合法JSON，任何内容变化都属于覆盖首次证据。
+    frozen_path.write_text('{"result":"changed"}\n', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="发生变化"):
+        cli_module._assert_frozen_result_unchanged(frozen_path, snapshot)
+    # 删除历史文件也必须给出独立明确错误。
+    frozen_path.unlink()
+    with pytest.raises(RuntimeError, match="被删除"):
+        cli_module._assert_frozen_result_unchanged(frozen_path, snapshot)
+
+
+def test_first_paid_run_lock_is_mutually_exclusive_and_always_cleaned(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """首次付费锁只能由一个进程持有，并在正常和异常退出时清理。"""
+
+    # 把全局锁路径重定向到pytest目录，绝不碰真实runtime锁。
+    cli_module = _load_step34_cli_module()
+    lock_path = tmp_path / "first-paid-run.lock"
+    monkeypatch.setattr(cli_module, "FIRST_RUN_LOCK_PATH", lock_path)
+    # 第一位运行者进入后，锁文件应贯穿整个上下文生命周期。
+    with cli_module._exclusive_first_paid_run_lock(enabled=True):
+        assert lock_path.is_file()
+        # 第二位运行者在读取Key或调用模型前就因x模式创建失败。
+        with (
+            pytest.raises(RuntimeError, match="已有首次付费实验正在运行"),
+            cli_module._exclusive_first_paid_run_lock(enabled=True),
+        ):
+            raise AssertionError("第二位运行者不应进入受保护区域")
+    # 正常退出必须释放锁。
+    assert not lock_path.exists()
+    # 业务代码抛错时finally同样必须释放锁，允许人工修复后重新运行。
+    with (
+        pytest.raises(RuntimeError, match="模拟实验失败"),
+        cli_module._exclusive_first_paid_run_lock(enabled=True),
+    ):
+        raise RuntimeError("模拟实验失败")
+    assert not lock_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("confirm_blind", "confirm_paid_api", "confirm_regression"),
+    [
+        (False, False, False),
+        (True, False, False),
+        (True, True, False),
+        (False, True, True),
+    ],
+)
+@pytest.mark.asyncio
+async def test_private_collector_requires_all_three_runner_confirmations_before_reads(
+    monkeypatch: pytest.MonkeyPatch,
+    confirm_blind: bool,
+    confirm_paid_api: bool,
+    confirm_regression: bool,
+) -> None:
+    """Collector缺少任一确认时必须在语料、盲题和模型访问前归零失败。"""
+
+    # 公开配置本身不含私有题目，可以在安装读取守卫前安全加载。
+    config = load_grounded_answer_success_config(CONFIG_PATH)
+    collector = PrivateGroundedAnswerDiagnosticCollector()
+    # 任何后续语料验证都代表安全检查顺序倒置，因此立即让测试失败。
+    touched_after_guard = False
+
+    def forbidden_corpus_access(
+        _config: GroundedAnswerSuccessExperimentConfig,
+    ) -> Path:
+        """记录并拒绝非法参数状态下的第一处文件读取入口。"""
+
+        nonlocal touched_after_guard
+        touched_after_guard = True
+        raise AssertionError("非法Collector不得读取语料或私有盲测")
+
+    # _verify_corpus位于任何正常执行路径的最前端，足以证明快速失败顺序。
+    monkeypatch.setattr(
+        grounded_success_module,
+        "_verify_corpus",
+        forbidden_corpus_access,
+    )
+    # 无Key设置进一步证明失败与个人.env和外部服务无关。
+    settings = Settings(
+        llm_backend="mock",
+        llm_api_key=None,
+        llm_base_url=None,
+        telemetry_enabled=False,
+    )
+    # 三把钥匙不全时，runner必须拒绝Collector。
+    with pytest.raises(ValueError, match="私有诊断Collector"):
+        await run_grounded_answer_success_experiment(
+            config,
+            runtime_settings=settings,
+            confirm_blind=confirm_blind,
+            confirm_paid_api=confirm_paid_api,
+            confirm_regression=confirm_regression,
+            private_diagnostic_collector=collector,
+        )
+    # 守卫保持False证明没有读取公开语料，更不可能读取私有盲题或调用API。
+    assert touched_after_guard is False
+    assert collector.case_count == 0
+
+
+@pytest.mark.asyncio
+async def test_evaluator_default_does_not_construct_private_diagnostic_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """未传Collector时即使完成评分，也不能在内存中组装完整私有Record。"""
+
+    # 两题满足评测器正负例约束，问题正文故意带私有marker。
+    positive = _answerable_case(
+        case_id="collector-off-positive",
+        question="PRIVATE-COLLECTOR-OFF-QUESTION",
+    )
+    negative = _unanswerable_case(
+        case_id="collector-off-negative",
+        question="PRIVATE-COLLECTOR-OFF-GAP",
+    )
+    hit = _hit(
+        chunk_id="chunk-collector-off",
+        document_id="DOC-INVOICE",
+        content="税号错误需要先红冲后重新开具。",
+    )
+
+    def reject_private_record_construction(**_values: object) -> object:
+        """若默认分支尝试组装题目、证据与答案，就立即失败。"""
+
+        raise AssertionError("未提供Collector时不得构造私有诊断Record")
+
+    # 最终全景Record只应出现在显式Collector分支中。
+    monkeypatch.setattr(
+        grounded_success_module,
+        "PrivateGroundedAnswerDiagnosticRecord",
+        reject_private_record_construction,
+    )
+    # 调用时故意省略private_diagnostic_collector，验证默认开关确实为关闭。
+    summary = await evaluate_grounded_answer_success(
+        profile_id="collector-default-off",
+        cases=[positive, negative],
+        query_policy=AllowAllKnowledgeQueryPolicy(),
+        retriever=_FixedByQuestionRetriever(
+            {
+                positive.question: [hit],
+                negative.question: [hit],
+            }
+        ),
+        answer_client=_RecordingAnswerClient(
+            {
+                positive.question: GroundedAnswerDraft(
+                    answer="需要先红冲后重新开具。",
+                    citation_ids=[hit.chunk.chunk_id],
+                    is_answerable=True,
+                ),
+                negative.question: GroundedAnswerDraft(
+                    answer="当前证据不足。",
+                    citation_ids=[],
+                    is_answerable=False,
+                ),
+            }
+        ),
+        top_k=5,
+        min_success_rate=1.0,
+        zero_tolerance_failure_codes=[
+            "forbidden_claim_present",
+            "invalid_or_unsupported_citation",
+            "unsupported_answer_generated",
+        ],
+    )
+    # 评分照常完成，说明默认关闭诊断不影响公开质量结果。
+    assert summary.total_cases == 2
+    assert "PRIVATE-COLLECTOR-OFF" not in summary.model_dump_json()
+
+
+async def _collect_private_diagnostic_fixture() -> tuple[
+    PrivateGroundedAnswerDiagnosticCollector,
+    GroundedAnswerSuccessSummary,
+]:
+    """用纯内存替身创建包含私有marker的两题诊断夹具。"""
+
+    # marker故意分布在问题、答案、证据和金标中，方便验证公开边界。
+    private_question = "PRIVATE-MARKER-QUESTION-不得公开"
+    hit = _hit(
+        chunk_id="chunk-private-diagnostic",
+        document_id="DOC-INVOICE",
+        content="PRIVATE-MARKER-EVIDENCE：税号错误需要先红冲后重新开具。",
+    )
+    positive = _answerable_case(
+        case_id="diagnostic-positive",
+        question=private_question,
+        fact=RequiredFactRule(
+            fact_id="private-fact-id",
+            answer_all_of=[["红冲"], ["重新开具"]],
+            evidence_all_of=[["红冲"], ["重新开具"]],
+            supporting_document_ids=["DOC-INVOICE"],
+        ),
+        tags=["PRIVATE-MARKER-GOLD-TAG"],
+    )
+    negative = _unanswerable_case(
+        case_id="diagnostic-negative",
+        question="PRIVATE-MARKER-GAP-QUESTION-不得公开",
+    )
+    # 同一证据只为确保两题都会进入回答器，整个测试不访问文件或网络。
+    retriever = _FixedByQuestionRetriever(
+        {
+            positive.question: [hit],
+            negative.question: [hit],
+        }
+    )
+    answer_client = _RecordingAnswerClient(
+        {
+            positive.question: GroundedAnswerDraft(
+                answer="PRIVATE-MARKER-ANSWER：需要红冲后重新开具。",
+                citation_ids=[hit.chunk.chunk_id],
+                is_answerable=True,
+            ),
+            negative.question: GroundedAnswerDraft(
+                answer="PRIVATE-MARKER-ABSTENTION：当前证据不足。",
+                citation_ids=[],
+                is_answerable=False,
+            ),
+        }
+    )
+    # 显式创建Collector是唯一会组装完整问题、证据与答案记录的开关。
+    collector = PrivateGroundedAnswerDiagnosticCollector()
+    summary = await evaluate_grounded_answer_success(
+        profile_id="private-diagnostic-test",
+        cases=[positive, negative],
+        query_policy=AllowAllKnowledgeQueryPolicy(),
+        retriever=retriever,
+        answer_client=answer_client,
+        top_k=5,
+        min_success_rate=1.0,
+        zero_tolerance_failure_codes=[
+            "forbidden_claim_present",
+            "invalid_or_unsupported_citation",
+            "unsupported_answer_generated",
+        ],
+        private_diagnostic_collector=collector,
+    )
+    # 返回完整私有Collector和与之对应的公开脱敏Summary。
+    return collector, summary
+
+
+@pytest.mark.asyncio
+async def test_private_collector_is_opt_in_and_public_output_stays_sanitized(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """只有显式Collector保存原始内容，公开Summary与控制台仍不能泄漏marker。"""
+
+    # 先运行启用Collector的内存夹具，证明私有记录确实包含人工复盘所需原文。
+    collector, summary = await _collect_private_diagnostic_fixture()
+    assert collector.case_count == 2
+    private_serialized = json.dumps(
+        [record.model_dump(mode="json") for record in collector.records],
+        ensure_ascii=False,
+    )
+    assert "PRIVATE-MARKER-QUESTION" in private_serialized
+    assert "PRIVATE-MARKER-ANSWER" in private_serialized
+    assert "PRIVATE-MARKER-EVIDENCE" in private_serialized
+    assert "PRIVATE-MARKER-GOLD-TAG" in private_serialized
+    # 公开Summary只保留case_id、事实ID和原因码，不含任何原始正文。
+    public_serialized = summary.model_dump_json()
+    assert "PRIVATE-MARKER" not in public_serialized
+    # CLI标准输出同样只打印比例、失败数量、case_id与原因码。
+    cli_module = _load_step34_cli_module()
+    cli_module._print_summary("千问回归候选", summary)
+    captured = capsys.readouterr()
+    assert "PRIVATE-MARKER" not in captured.out
+    assert "PRIVATE-MARKER" not in captured.err
+    # 未提供Collector时，评测函数没有任何隐式全局文件或缓存可保存私有记录。
+    assert "private_diagnostic_collector" not in summary.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_private_writer_creates_unique_regression_files_in_private_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """每次私有写盘都生成独立REGRESSION文件，并且内容不进入公开目录。"""
+
+    # 使用纯内存评测结果准备两题完整诊断。
+    collector, _ = await _collect_private_diagnostic_fixture()
+    private_root = tmp_path / "data/private_evaluation"
+
+    def resolve_private_root(relative_path: str | Path) -> Path:
+        """只允许writer请求其固定私有根，并映射到临时目录。"""
+
+        assert Path(relative_path).as_posix() == "data/private_evaluation"
+        return private_root
+
+    # 替换项目路径解析器，确保测试不创建真实data/private_evaluation文件。
+    monkeypatch.setattr(
+        grounded_success_module,
+        "resolve_project_path",
+        resolve_private_root,
+    )
+    # 缩短Windows临时文件名，但仍用递增值验证两次写入保持唯一。
+    _install_short_writer_uuid(monkeypatch)
+    writer_kwargs = {
+        "experiment_id": "private-writer-test",
+        "experiment_version": "1.0.0",
+        "dataset_sha256": "a" * 64,
+        "candidate_fingerprint": "b" * 64,
+        "profile_id": "qwen-regression-test",
+    }
+    # 连续写两次模拟两轮回归，每轮都必须保留而不是覆盖上一轮。
+    first_path = write_private_grounded_answer_diagnostics(
+        collector,
+        **writer_kwargs,
+    )
+    second_path = write_private_grounded_answer_diagnostics(
+        collector,
+        **writer_kwargs,
+    )
+    assert first_path != second_path
+    assert first_path.is_file()
+    assert second_path.is_file()
+    assert first_path.name.endswith("_REGRESSION.json")
+    assert second_path.name.endswith("_REGRESSION.json")
+    # 两个路径都必须位于固定私有诊断子目录内。
+    expected_parent = (
+        private_root / "diagnostics/grounded_answer_success"
+    ).resolve()
+    assert first_path.parent == expected_parent
+    assert second_path.parent == expected_parent
+    # 私有payload明确标记回归性质，并保存完整marker供本地复盘。
+    first_payload = json.loads(first_path.read_text(encoding="utf-8"))
+    assert first_payload["run_kind"] == "REGRESSION"
+    assert first_payload["record_count"] == 2
+    assert "PRIVATE-MARKER-QUESTION" in json.dumps(
+        first_payload,
+        ensure_ascii=False,
+    )
+    # 成功发布后不能残留任何可能被误上传的partial别名。
+    assert list(expected_parent.glob("*.partial")) == []
+    assert list(expected_parent.glob(".*.partial")) == []
+
+
+@pytest.mark.asyncio
+async def test_private_writer_failure_removes_all_partial_and_final_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """私有写盘在fsync异常时不能留下半文件、最终文件或私有正文碎片。"""
+
+    # Collector完全在内存生成，不读取真实盲题。
+    collector, _ = await _collect_private_diagnostic_fixture()
+    private_root = tmp_path / "data/private_evaluation"
+    monkeypatch.setattr(
+        grounded_success_module,
+        "resolve_project_path",
+        lambda _relative_path: private_root,
+    )
+    # 避免Windows长pytest路径在到达fsync模拟点前触发MAX_PATH。
+    _install_short_writer_uuid(monkeypatch)
+
+    def fail_fsync(_file_descriptor: int) -> None:
+        """模拟操作系统在完整落盘前报告磁盘写入失败。"""
+
+        raise OSError("模拟磁盘刷盘失败")
+
+    # writer模块自己的os引用被替换，异常发生在最终路径发布之前。
+    monkeypatch.setattr(grounded_success_module.os, "fsync", fail_fsync)
+    with pytest.raises(OSError, match="模拟磁盘刷盘失败"):
+        write_private_grounded_answer_diagnostics(
+            collector,
+            experiment_id="private-writer-failure",
+            experiment_version="1.0.0",
+            dataset_sha256="c" * 64,
+            candidate_fingerprint="d" * 64,
+            profile_id="qwen-regression-test",
+        )
+    # 目录可以存在，但目录树中不得保留任何含私有内容的文件。
+    assert [path for path in private_root.rglob("*") if path.is_file()] == []
+
+
+def test_private_evaluation_directory_is_excluded_from_git_and_docker() -> None:
+    """完整私有目录必须同时排除于Git提交与Docker构建上下文。"""
+
+    # 两份忽略文件都属于公开仓库配置，不涉及任何私有题目内容。
+    gitignore_lines = {
+        line.strip()
+        for line in (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    }
+    dockerignore_lines = {
+        line.strip()
+        for line in (PROJECT_ROOT / ".dockerignore")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    }
+    # 目录级规则覆盖sealed题集和未来所有diagnostics子目录。
+    assert "data/private_evaluation/" in gitignore_lines
+    assert "data/private_evaluation/" in dockerignore_lines

@@ -14,7 +14,7 @@ from serviceops_agent.domain.knowledge import RetrievalHit
 from serviceops_agent.rag.retriever import KnowledgeRetriever
 
 # QueryPolicyMode 是环境配置和实验Profile允许使用的有限策略版本。
-type QueryPolicyMode = Literal["off", "deterministic_v1"]
+type QueryPolicyMode = Literal["off", "deterministic_v1", "deterministic_v2"]
 
 
 class KnowledgeQueryAssessment(BaseModel):
@@ -186,6 +186,59 @@ class DeterministicFAQScopePolicy:
         )
 
 
+class DeterministicFAQScopePolicyV2(DeterministicFAQScopePolicy):
+    """在v1高置信规则上，区分“索取凭据”与“咨询凭据安全”。
+
+    v1保留用于复现历史实验；v2只修复一个已经由全新密封集暴露的真实误拒：用户询问客服是否可以
+    索要密码或验证码时，应允许系统检索公开安全规则，而不是把用户误判成正在索取凭据本身。
+    """
+
+    def __init__(self) -> None:
+        """编译安全咨询和明确索密两个互斥优先级规则。"""
+
+        # 初始化v1全部内部政策、凭据、天气、投资、医疗和内容生成规则。
+        super().__init__()
+        # safety_consultation要求同时出现服务角色、索要/提供语境和凭据词。
+        self._credential_safety_consultation = re.compile(
+            r"(?:客服|官方|工作人员|维修人员|平台).{0,20}"
+            r"(?:索要|要求|让我|让用户|需要我|能否|可以).{0,20}"
+            r"(?:密码|验证码)"
+            r"|(?:密码|验证码).{0,20}(?:给|提供|告诉).{0,10}"
+            r"(?:客服|工作人员|维修人员|官方).{0,10}"
+            r"(?:吗|安全|合规|应该|能不能|可不可以)",
+            re.IGNORECASE,
+        )
+        # direct_extraction仍优先拦截“验证码是多少”“直接告诉我”等明确索取内容。
+        self._direct_credential_extraction = re.compile(
+            r"(?:验证码|密码).{0,10}"
+            r"(?:是多少|内容是什么|直接告诉我|发给我|猜一下)"
+            r"|(?:直接告诉我|发给我|猜一下).{0,10}(?:验证码|密码)",
+            re.IGNORECASE,
+        )
+
+    def assess(self, query: str) -> KnowledgeQueryAssessment:
+        """安全咨询优先放行，混入明确索密指令时仍交给v1拒绝。"""
+
+        # 与v1一致地忽略两端空白。
+        normalized_query = query.strip()
+        # 只有明确安全咨询且没有直接索取秘密内容时才应用窄范围例外。
+        if (
+            self._credential_safety_consultation.search(normalized_query)
+            and not self._direct_credential_extraction.search(normalized_query)
+        ):
+            # 允许进入公开安全知识检索，不把问题标成敏感外发请求。
+            return KnowledgeQueryAssessment(
+                # 后续证据门仍会决定是否有充分依据。
+                allowed=True,
+                # 独立原因码便于统计v2修复了多少安全咨询误拒。
+                reason_code="scope_allowed_security_consultation",
+                # 用户没有提供或索取真实秘密内容。
+                sensitive=False,
+            )
+        # 其他所有请求保持v1行为，避免扩大未知边界。
+        return super().assess(normalized_query)
+
+
 class PolicyFilteredKnowledgeRetriever:
     """为离线评测复用同一查询策略的检索器装饰器。"""
 
@@ -222,5 +275,9 @@ def create_knowledge_query_policy(mode: QueryPolicyMode) -> KnowledgeQueryPolicy
     if mode == "off":
         # 返回完全放行策略。
         return AllowAllKnowledgeQueryPolicy()
-    # Literal 已限制另一个合法值为deterministic_v1。
+    # v2只增加安全咨询的窄范围放行，不改变其他规则。
+    if mode == "deterministic_v2":
+        # 返回版本化新策略，旧实验仍可显式使用v1。
+        return DeterministicFAQScopePolicyV2()
+    # 剩余合法值为deterministic_v1，保持全部历史行为。
     return DeterministicFAQScopePolicy()

@@ -1,0 +1,18 @@
+{
+  "experiment_id": "serviceops-semantic-judge-calibration",
+  "version": "1.0.0",
+  "evaluator_version": "hybrid-grounded-evaluator-v1.0",
+  "source_diagnostic_sha256": "e45be102a01529fed595ba825551f0ada8706aa41dc49580eb983c972f5e020e",
+  "source_dataset_sha256": "605a83136532d6942724660b8ed8e12f185d49f1d908e92830a6ca2cf767c95b",
+  "source_candidate_fingerprint": "beefd956668ad87bb40ed8923a8111ef08d4e122feec6a59f839c6ba3e314006",
+  "audit_path": "data/evaluation/results/grounded_answer_v3_sealed_regression_audit.json",
+  "audit_sha256": "fec161ae922f6fe6f8bf9b52e713500e59a466a17fd3fb5d5e23374c92557848",
+  "disputed_case_count": 10,
+  "calibration_item_count": 20,
+  "judge_model": "qwen-plus",
+  "judge_temperature": 0.0,
+  "max_evidence_chars": 4000,
+  "judge_prompt_version": "v1",
+  "frozen_judge_fingerprint": "d2c395db0d47b3b59cfe86a35c9f02dede0dae5dab53eee8ee69850efddff160",
+  "min_calibration_accuracy": 0.9
+}

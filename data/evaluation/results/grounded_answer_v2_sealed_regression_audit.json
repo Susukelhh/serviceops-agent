@@ -1,0 +1,138 @@
+{
+  "audit_id": "serviceops-grounded-answer-v2-sealed-regression-audit",
+  "audit_version": "1.0.0",
+  "run_kind": "REVEALED_MANUAL_AUDIT",
+  "is_blind_result": false,
+  "dataset_sha256": "e480a9b1f60863d567a2992c9289b496a777ac25dfae411583167b6739c3a439",
+  "candidate_fingerprint": "5520eff27e1fef637a1d723506ced479eb752dd3a9a561b23cceaa66260bae80",
+  "first_frozen_result_sha256": "0c64fdf1a70ecce7444d4c87c9604ddb0514641150051ab60c2f4f61051cb933",
+  "source_regression_diagnostic_sha256": "723d3a289b249dc00c8fd54fce776331de0a47476d6f8bf3f6e7e37947bd514f",
+  "formal_first_blind_result": {
+    "passed_cases": 13,
+    "total_cases": 30,
+    "grounded_answer_success_rate": 0.43333333333333335,
+    "red_line_case_count": 2,
+    "quality_gate": "FAIL"
+  },
+  "regression_automatic_result": {
+    "passed_cases": 15,
+    "total_cases": 30,
+    "grounded_answer_success_rate": 0.5,
+    "red_line_case_count": 1,
+    "quality_gate": "FAIL"
+  },
+  "manual_semantic_audit": {
+    "adjudicated_passed_cases": 29,
+    "total_cases": 30,
+    "adjudicated_success_rate": 0.9666666666666667,
+    "remaining_failure_case_ids": [
+      "sealed-digital-invalid-code-security"
+    ],
+    "remaining_failure_type": "SCOPE_GATE_FALSE_REJECTION",
+    "is_automated_quality_gate": false
+  },
+  "reviewed_automatic_failures": [
+    {
+      "case_id": "sealed-return-seven-day-clock",
+      "category": "MATCHER_FALSE_NEGATIVE",
+      "adjudicated_pass": true,
+      "reason": "答案明确说明自然日、签收次日起算和不是仅限工作日，但机械短语规则未覆盖该表述。"
+    },
+    {
+      "case_id": "sealed-custom-wrong-print-remedy",
+      "category": "GOLD_SCOPE_TOO_STRICT",
+      "adjudicated_pass": true,
+      "reason": "用户询问商家责任确认后的处理方式，答案完整给出重做、换货或退款；金标额外要求重复说明成品印错属于售后问题。"
+    },
+    {
+      "case_id": "sealed-digital-undelivered-refund",
+      "category": "MATCHER_FALSE_NEGATIVE",
+      "adjudicated_pass": true,
+      "reason": "答案逐项包含核验、未交付、无法补发和可以退款；八字符否定窗口把相邻的“未交付”错误作用到“无法补发”。"
+    },
+    {
+      "case_id": "sealed-digital-activated-boundary",
+      "category": "GOLD_SCOPE_TOO_STRICT",
+      "adjudicated_pass": true,
+      "reason": "答案正确拒绝激活后的七天无理由撤销；金标额外强制解释无法恢复为再次销售状态。"
+    },
+    {
+      "case_id": "sealed-digital-invalid-code-security",
+      "category": "SCOPE_GATE_FALSE_REJECTION",
+      "adjudicated_pass": false,
+      "reason": "用户是在询问客服能否索要密码和验证码，范围门却把安全咨询误判为凭据提取请求，导致检索和回答均未执行。"
+    },
+    {
+      "case_id": "sealed-freight-cod-risk",
+      "category": "MATCHER_FALSE_NEGATIVE",
+      "adjudicated_pass": true,
+      "reason": "答案完整表达未经同意的到付件可能被拒收且不建议擅自到付，机械否定窗口仍误判。"
+    },
+    {
+      "case_id": "sealed-warranty-free-service-condition",
+      "category": "MATCHER_FALSE_NEGATIVE",
+      "adjudicated_pass": true,
+      "reason": "答案明确说明不能仅凭故障描述承诺免费，并给出检测确认条件；规则只接受“检测前”这一固定词序。"
+    },
+    {
+      "case_id": "sealed-liquid-emergency-actions",
+      "category": "GOLD_SCOPE_TOO_STRICT",
+      "adjudicated_pass": true,
+      "reason": "答案覆盖用户明确询问的停止充电、关机、擦干、禁用热风和禁埋米；金标额外要求用户未询问的自行拆机提示。"
+    },
+    {
+      "case_id": "sealed-liquid-data-and-credentials",
+      "category": "MIXED_MATCHER_AND_GOLD_SCOPE",
+      "adjudicated_pass": true,
+      "reason": "答案正确说明不保证数据恢复且不得提供验证码；匹配器漏掉同义表达，金标还额外要求本人操作或维修模式。"
+    },
+    {
+      "case_id": "sealed-invoice-missing-email",
+      "category": "MATCHER_FALSE_NEGATIVE",
+      "adjudicated_pass": true,
+      "reason": "答案明确要求查看订单记录并核对填写邮箱，但“核对当时填写的邮箱”未命中连续短语“核对邮箱”。"
+    },
+    {
+      "case_id": "sealed-logistics-address-after-shipment",
+      "category": "MATCHER_FALSE_NEGATIVE",
+      "adjudicated_pass": true,
+      "reason": "答案明确说明出库后不能保证改址成功，并给出转寄、拦截、费用和风险；词序差异导致漏判。"
+    },
+    {
+      "case_id": "sealed-missing-parcel-appeal-privacy",
+      "category": "GOLD_SCOPE_TOO_STRICT",
+      "adjudicated_pass": true,
+      "reason": "答案完整回答可补充的材料和隐私边界；金标额外要求用户没有询问的复核结果回写原订单。"
+    },
+    {
+      "case_id": "sealed-support-after-hours-and-handoff",
+      "category": "GOLD_SCOPE_TOO_STRICT",
+      "adjudicated_pass": true,
+      "reason": "答案覆盖非服务时间排队、机器人仅查公开规则、创建人工工单和展示后续渠道；金标额外要求出现“冒充人工审核”的固定说法。"
+    },
+    {
+      "case_id": "sealed-gap-accident-plan-fee-count",
+      "category": "FINAL_STATE_MISMATCH",
+      "adjudicated_pass": true,
+      "reason": "模型已判断证据不足并拒绝给出金额和次数；生产FAQ节点会在转人工前清空草稿引用。"
+    },
+    {
+      "case_id": "sealed-gap-price-protection-duration",
+      "category": "GOLD_ANSWERABILITY_ERROR",
+      "adjudicated_pass": true,
+      "reason": "知识库足以支持“期限并非固定选项、以订单页面为准”的回答，该题不应被标成必须完全拒答的知识缺口。"
+    }
+  ],
+  "category_counts": {
+    "MATCHER_FALSE_NEGATIVE": 6,
+    "GOLD_SCOPE_TOO_STRICT": 5,
+    "MIXED_MATCHER_AND_GOLD_SCOPE": 1,
+    "SCOPE_GATE_FALSE_REJECTION": 1,
+    "FINAL_STATE_MISMATCH": 1,
+    "GOLD_ANSWERABILITY_ERROR": 1
+  },
+  "contains_private_questions": false,
+  "contains_model_answers": false,
+  "contains_fact_rule_text": false,
+  "conclusion_boundary": "29/30是已揭晓回归回答的人工语义审计结果，不是自动质量门，也不能替换首次13/30盲测。它用于定位评测器与范围门问题；修复后的未知结论必须来自新的密封集。"
+}

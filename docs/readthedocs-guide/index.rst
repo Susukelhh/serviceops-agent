@@ -21,7 +21,9 @@ ServiceOps Agent：从代码到面试
    ``Gate FAIL``。项目随后把Bad Case转入第32步意图专项：千问v2冻结候选通过32条开发题与16条
    一次性锁定题并晋级；RRF的1.50权重仍未晋级，项目也不宣称Recall已经提升。第34步冻结了
    “端到端有据回答成功率”契约，零费用风险对照为14/25（56%）；首次千问候选为10/25（40%），
-   虽将知识缺口正确拒答提高到5/6，但可回答题完整通过只有5/19，因此质量门失败并原样冻结。
+   虽将知识缺口正确拒答提高到5/6，但可回答题完整通过只有5/19，因此质量门失败并原样冻结。第35步
+   私有诊断后用v1.1开发口径零费用重放同一批原回答为20/25（80%），但仍有一条无依据回答红线，
+   Gate继续FAIL；该结果是已揭晓开发重评分，不替换首次40%。
 
 .. tip::
 
@@ -61,6 +63,12 @@ ServiceOps Agent：从代码到面试
    11_public_demo
    12_end_to_end_blind_test
    13_grounded_answer_success_rate
+   14_grounded_answer_v2_development
+   15_grounded_answer_v2_sealed
+   16_evaluator_audit_and_scope_v2
+   17_grounded_answer_v3_sealed
+   18_semantic_judge_calibration
+   19_hybrid_grounded_evaluator
    07_code_reading_route
    08_glossary
 

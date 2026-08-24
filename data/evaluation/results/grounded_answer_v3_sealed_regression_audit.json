@@ -1,0 +1,59 @@
+{
+  "audit_id": "serviceops-grounded-answer-v3-regression-audit",
+  "audit_version": "1.0.0",
+  "source_experiment_id": "serviceops-grounded-answer-v3-sealed",
+  "source_experiment_version": "3.0.0",
+  "source_dataset_sha256": "605a83136532d6942724660b8ed8e12f185d49f1d908e92830a6ca2cf767c95b",
+  "source_candidate_fingerprint": "beefd956668ad87bb40ed8923a8111ef08d4e122feec6a59f839c6ba3e314006",
+  "first_frozen_result_sha256": "6f477868c65f32a4be53b7518b263f7ae9da71f1540a469f906aaf2e07db8248",
+  "private_regression_diagnostic_sha256": "e45be102a01529fed595ba825551f0ada8706aa41dc49580eb983c972f5e020e",
+  "formal_first_sealed_result": {
+    "passed_cases": 20,
+    "total_cases": 30,
+    "grounded_answer_success_rate": 0.6666666666666666,
+    "red_line_case_count": 0,
+    "quality_gate_passed": false
+  },
+  "revealed_regression_automatic_result": {
+    "passed_cases": 20,
+    "total_cases": 30,
+    "grounded_answer_success_rate": 0.6666666666666666,
+    "red_line_case_count": 0,
+    "quality_gate_passed": false
+  },
+  "human_semantic_adjudication": {
+    "semantically_successful_cases": 30,
+    "total_cases": 30,
+    "model_omission_case_ids": [],
+    "matcher_false_negative_case_ids": [
+      "sealed3-return-current-rule-not-retired",
+      "sealed3-custom-no-refund-before-proof",
+      "sealed3-freight-protection-not-any-price",
+      "sealed3-liquid-no-remote-dry-guarantee",
+      "sealed3-invoice-pending-change",
+      "sealed3-invoice-correction-progress",
+      "sealed3-logistics-received-no-duplicate",
+      "sealed3-price-refund-relationship"
+    ],
+    "gold_scope_too_strict_case_ids": [
+      "sealed3-warranty-term-varies",
+      "sealed3-missing-parcel-shared-investigation"
+    ],
+    "ambiguous_needs_review_case_ids": []
+  },
+  "interpretation": {
+    "formal_result_remains_authoritative": true,
+    "human_audit_is_not_a_new_blind_score": true,
+    "prompt_change_supported_by_audit": false,
+    "primary_issue": "deterministic_semantic_matcher_recall_and_gold_scope",
+    "safety_consultation_scope_v2_validated": true,
+    "knowledge_gap_correct_rejection_count": 10,
+    "knowledge_gap_total_count": 10
+  },
+  "privacy": {
+    "contains_private_questions": false,
+    "contains_model_answers": false,
+    "contains_evidence_text": false,
+    "contains_fact_rule_text": false
+  }
+}

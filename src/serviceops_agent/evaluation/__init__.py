@@ -26,18 +26,25 @@ from serviceops_agent.evaluation.experiment import (
 )
 from serviceops_agent.evaluation.grounded_answer_success_experiment import (
     ForbiddenClaimRule,
+    GroundedAnswerDevelopmentScoringProfile,
+    GroundedAnswerFactGroupExtension,
     GroundedAnswerSuccessCase,
     GroundedAnswerSuccessCaseResult,
     GroundedAnswerSuccessExperimentConfig,
     GroundedAnswerSuccessExperimentReport,
     GroundedAnswerSuccessSummary,
+    PrivateGroundedAnswerDiagnosticCollector,
     RequiredFactRule,
     evaluate_grounded_answer_success,
     grounded_answer_candidate_fingerprint,
+    load_grounded_answer_development_scoring_profile,
     load_grounded_answer_success_config,
     load_private_grounded_answer_cases,
+    load_private_grounded_answer_diagnostic_collector,
+    replay_private_grounded_answer_diagnostics,
     run_grounded_answer_success_experiment,
     validate_grounded_answer_evidence_labels,
+    write_private_grounded_answer_diagnostics,
 )
 from serviceops_agent.evaluation.grounding_sufficiency_experiment import (
     GroundingCaseResult,
@@ -52,6 +59,16 @@ from serviceops_agent.evaluation.grounding_sufficiency_experiment import (
     load_grounding_evaluation_cases,
     load_grounding_sufficiency_experiment_config,
     run_grounding_sufficiency_experiment,
+)
+from serviceops_agent.evaluation.hybrid_grounded_evaluator import (
+    CalibratedSemanticVerdict,
+    HybridGroundedCaseDecision,
+    HybridGroundedEvaluationReport,
+    HybridGroundedEvaluationSummary,
+    HybridGroundedEvaluatorConfig,
+    hybrid_grounded_evaluator_fingerprint,
+    load_hybrid_grounded_evaluator_config,
+    run_hybrid_grounded_evaluation_replay,
 )
 from serviceops_agent.evaluation.intent_classification_experiment import (
     IntentCaseResult,
@@ -138,6 +155,20 @@ from serviceops_agent.evaluation.rag_semantic_embedding_experiment import (
     load_rag_semantic_embedding_experiment_config,
     run_rag_semantic_embedding_experiment,
 )
+from serviceops_agent.evaluation.semantic_judge_calibration import (
+    LangChainSemanticJudgeClient,
+    SemanticJudgeCalibrationConfig,
+    SemanticJudgeCalibrationItemResult,
+    SemanticJudgeCalibrationReport,
+    SemanticJudgeCalibrationSummary,
+    SemanticJudgeClient,
+    SemanticJudgeVerdict,
+    evaluate_semantic_judge_calibration,
+    load_private_semantic_calibration_items,
+    load_semantic_judge_calibration_config,
+    run_semantic_judge_calibration,
+    semantic_judge_candidate_fingerprint,
+)
 
 # __all__ 明确该包承诺稳定支持的公共接口。
 __all__ = [
@@ -166,6 +197,12 @@ __all__ = [
     "GroundingQualityGate",
     "GroundingSufficiencyExperimentConfig",
     "GroundingSufficiencyExperimentReport",
+    # 第40步确定性红线优先、语义完整性二级复核的混合裁决契约。
+    "CalibratedSemanticVerdict",
+    "HybridGroundedCaseDecision",
+    "HybridGroundedEvaluationReport",
+    "HybridGroundedEvaluationSummary",
+    "HybridGroundedEvaluatorConfig",
     # 第34步事实级金标、单题结果、单一成功率汇总与实验契约。
     "ForbiddenClaimRule",
     "GroundedAnswerSuccessCase",
@@ -173,6 +210,11 @@ __all__ = [
     "GroundedAnswerSuccessExperimentConfig",
     "GroundedAnswerSuccessExperimentReport",
     "GroundedAnswerSuccessSummary",
+    # 第35步已揭晓开发集的评分修正与同义扩展契约。
+    "GroundedAnswerDevelopmentScoringProfile",
+    "GroundedAnswerFactGroupExtension",
+    # 第34步真实回归的本机私有原始诊断收集器；不会进入公开Report。
+    "PrivateGroundedAnswerDiagnosticCollector",
     "RequiredFactRule",
     "IntentCaseResult",
     "IntentClassificationExperimentConfig",
@@ -228,6 +270,14 @@ __all__ = [
     "RAGSemanticEmbeddingExperimentReport",
     "RAGSemanticProfileResult",
     "RAGSemanticQualityGate",
+    # 第39步人工校准的语义完整性Judge契约、结果与报告。
+    "LangChainSemanticJudgeClient",
+    "SemanticJudgeCalibrationConfig",
+    "SemanticJudgeCalibrationItemResult",
+    "SemanticJudgeCalibrationReport",
+    "SemanticJudgeCalibrationSummary",
+    "SemanticJudgeClient",
+    "SemanticJudgeVerdict",
     # 构建完全离线且资源隔离的整图评测目标。
     "build_offline_agent_evaluation_target",
     # 构建真实千问聊天决策但副作用隔离的候选整图。
@@ -239,6 +289,7 @@ __all__ = [
     "evaluate_intent_predictions",
     "evaluate_keyword_intent_baseline",
     "evaluate_public_demo_blind_suite",
+    "evaluate_semantic_judge_calibration",
     # 按黄金参考路径估算候选聊天模型调用量。
     "estimate_planned_qwen_chat_calls",
     # 执行整个 RAG 检索数据集的评测函数。
@@ -251,10 +302,15 @@ __all__ = [
     "load_grounding_evaluation_cases",
     "load_grounding_sufficiency_experiment_config",
     "load_grounded_answer_success_config",
+    "load_grounded_answer_development_scoring_profile",
+    "load_hybrid_grounded_evaluator_config",
+    "load_private_grounded_answer_diagnostic_collector",
     "load_private_grounded_answer_cases",
     "load_intent_evaluation_cases",
     "load_intent_experiment_config",
     "load_public_demo_blind_config",
+    "load_private_semantic_calibration_items",
+    "load_semantic_judge_calibration_config",
     # 从受版本控制 JSON 加载评测集。
     "load_rag_evaluation_cases",
     "load_rag_end_to_end_cases",
@@ -271,6 +327,8 @@ __all__ = [
     "run_candidate_experiment",
     "run_grounding_sufficiency_experiment",
     "run_grounded_answer_success_experiment",
+    "run_hybrid_grounded_evaluation_replay",
+    "replay_private_grounded_answer_diagnostics",
     "run_intent_classification_experiment",
     # 运行第24步零费用困难Baseline。
     "run_rag_problem_baseline",
@@ -279,11 +337,16 @@ __all__ = [
     "run_rag_scope_experiment",
     "run_rag_semantic_embedding_experiment",
     "run_rag_end_to_end_experiment",
+    "run_semantic_judge_calibration",
     # 从既有单轮结果聚合稳定性和晋级结论。
     "summarize_candidate_experiment",
     "validate_grounded_answer_evidence_labels",
+    # 把完整私有诊断独占写入git忽略目录，绝不覆盖既有回归文件。
+    "write_private_grounded_answer_diagnostics",
     "grounding_prompt_sha256",
     "grounded_answer_candidate_fingerprint",
+    "hybrid_grounded_evaluator_fingerprint",
     "intent_classifier_prompt_sha256",
     "rag_end_to_end_candidate_fingerprint",
+    "semantic_judge_candidate_fingerprint",
 ]
