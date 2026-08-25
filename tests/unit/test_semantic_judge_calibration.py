@@ -48,6 +48,12 @@ FROZEN_RESULT_PATH: Path = (
     PROJECT_ROOT
     / "data/evaluation/results/semantic_judge_calibration_v1_result.json"
 )
+# PRIVATE_DIAGNOSTIC_DIRECTORY是第39步组装校准项所需的本机私有诊断目录。
+# 这里只检查目录是否存在，不扫描文件名、原始问题、模型回答或证据正文。
+PRIVATE_DIAGNOSTIC_DIRECTORY: Path = (
+    PROJECT_ROOT
+    / "data/private_evaluation/diagnostics/grounded_answer_success"
+)
 
 
 class _CalibratedFakeJudge:
@@ -147,6 +153,10 @@ def _load_step39_module() -> ModuleType:
     return module
 
 
+@pytest.mark.skipif(
+    not PRIVATE_DIAGNOSTIC_DIRECTORY.is_dir(),
+    reason="公开CI不包含第39步来源诊断，仅在恢复私有资料的本机装配20条校准项",
+)
 def test_step39_config_fingerprint_and_private_items_are_frozen() -> None:
     """来源SHA、Judge指纹、10条正向和10条反例必须同时有效。"""
 
@@ -172,6 +182,10 @@ def test_step39_config_fingerprint_and_private_items_are_frozen() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not PRIVATE_DIAGNOSTIC_DIRECTORY.is_dir(),
+    reason="公开CI不读取私有问题、答案和证据，本测试只在本机验证Judge输入隔离",
+)
 async def test_step39_calibrated_fake_reaches_full_agreement_without_label_leakage() -> None:
     """Judge只收到三项私有数据，人工expected标签只在调用结束后比较。"""
 
@@ -217,6 +231,10 @@ async def test_step39_calibrated_fake_reaches_full_agreement_without_label_leaka
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not PRIVATE_DIAGNOSTIC_DIRECTORY.is_dir(),
+    reason="负对照组装依赖本机私有原答案，公开CI只运行不含正文的确定性契约测试",
+)
 async def test_step39_negative_controls_reject_an_always_pass_judge() -> None:
     """全部判PASS的Judge只能得50%，不能通过90%校准门。"""
 

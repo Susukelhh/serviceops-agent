@@ -33,6 +33,11 @@ from serviceops_agent.evaluation import (
 CONFIG_PATH: Path = (
     PROJECT_ROOT / "data/evaluation/grounded_answer_v2_sealed_experiment.json"
 )
+# PRIVATE_DATASET_PATH只用于判断当前机器是否恢复了被Git忽略的第36步密封题。
+# 公开CI按设计不会拥有该文件，因此不能把“私有文件不存在”误报成生产代码回归。
+PRIVATE_DATASET_PATH: Path = (
+    PROJECT_ROOT / "data/private_evaluation/grounded_answer_success_v2.json"
+)
 
 
 def _load_step36_module() -> ModuleType:
@@ -75,6 +80,10 @@ def _args(
     )
 
 
+@pytest.mark.skipif(
+    not PRIVATE_DATASET_PATH.is_file(),
+    reason="公开CI不包含第36步私有密封题，仅在恢复私有资料的本机执行完整契约检查",
+)
 def test_step36_sealed_dataset_contract_and_evidence_are_frozen() -> None:
     """30题、20正10负、SHA、证据切片和Prompt v2指纹必须同时有效。"""
 

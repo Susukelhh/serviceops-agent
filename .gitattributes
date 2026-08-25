@@ -1,0 +1,5 @@
+# 冻结实验会对知识语料和公开结果的“原始字节”计算 SHA-256。
+# Windows 的 core.autocrlf=true 会把 LF 改成 CRLF，肉眼内容不变但文件指纹会变化。
+# 这里只约束参与冻结校验的公开数据目录，不改变用户私有密封题或 Windows 批处理脚本。
+data/experiments/rag_v2/knowledge_documents.json text eol=lf
+data/evaluation/** text eol=lf

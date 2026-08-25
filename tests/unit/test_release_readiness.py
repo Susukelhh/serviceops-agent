@@ -58,3 +58,22 @@ def test_release_audit_passes_secret_ignore_link_and_frozen_evidence_checks() ->
     assert by_id["readme_local_links"].status == "pass"
     # 端到端摘要必须与冻结指纹和12条锁定规模一致。
     assert by_id["frozen_rag_evidence"].status == "pass"
+
+
+def test_frozen_public_evidence_is_checked_out_with_lf_line_endings() -> None:
+    """参与原始字节SHA校验的公开数据必须在Windows和Linux都保持LF。"""
+
+    # Git属性是跨平台检出契约；没有它时Windows可能把LF静默改成CRLF。
+    attributes_path = PROJECT_ROOT / ".gitattributes"
+    # 文件缺失就无法保证干净克隆后的冻结SHA仍与公开配置一致。
+    assert attributes_path.is_file()
+    # 去掉空行和注释后再检查两条真正生效的规则，避免注释文字造成假通过。
+    rules = {
+        line.strip()
+        for line in attributes_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    # 困难RAG知识语料被第34至38步配置按原始字节冻结，必须单独锁定LF。
+    assert "data/experiments/rag_v2/knowledge_documents.json text eol=lf" in rules
+    # 第39至40步还会校验多个公开配置与结果JSON，因此整个评测目录统一保持LF。
+    assert "data/evaluation/** text eol=lf" in rules

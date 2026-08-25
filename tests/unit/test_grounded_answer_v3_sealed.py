@@ -36,6 +36,11 @@ from serviceops_agent.rag.query_policy import create_knowledge_query_policy
 CONFIG_PATH: Path = (
     PROJECT_ROOT / "data/evaluation/grounded_answer_v3_sealed_experiment.json"
 )
+# PRIVATE_DATASET_PATH只声明本机私有密封题的预期位置，不读取题目正文。
+# GitHub Actions没有这份被忽略文件时，依赖真实题目的测试应明确跳过而不是失败。
+PRIVATE_DATASET_PATH: Path = (
+    PROJECT_ROOT / "data/private_evaluation/grounded_answer_success_v3.json"
+)
 # AUDIT_PATH只含稳定Case ID与分类，不含私有问题、回答、证据或事实规则。
 AUDIT_PATH: Path = (
     PROJECT_ROOT
@@ -65,6 +70,10 @@ def _load_step38_module() -> ModuleType:
     return module
 
 
+@pytest.mark.skipif(
+    not PRIVATE_DATASET_PATH.is_file(),
+    reason="公开CI不包含第38步私有密封题，仅在恢复私有资料的本机执行完整契约检查",
+)
 def test_step38_dataset_candidate_and_evidence_are_frozen() -> None:
     """30题、20正10负、证据锚点、范围门v2和指纹必须同时有效。"""
 
@@ -92,6 +101,10 @@ def test_step38_dataset_candidate_and_evidence_are_frozen() -> None:
     )
 
 
+@pytest.mark.skipif(
+    not PRIVATE_DATASET_PATH.is_file(),
+    reason="该范围门回归需要第38步私有安全咨询原文，公开CI不得持有该内容",
+)
 def test_step38_scope_v2_allows_sealed_security_consultation() -> None:
     """安全咨询正例必须放行，但测试代码不公开其问题正文。"""
 
