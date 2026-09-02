@@ -33,7 +33,7 @@ from serviceops_agent.security.jwt_auth import (
 )
 
 # 有限角色与 Scope 用于构造合法和越权组合。
-from serviceops_agent.security.models import PermissionScope, Role
+from serviceops_agent.security.models import ROLE_SCOPE_POLICY, PermissionScope, Role
 
 
 def test_valid_customer_token_decodes_to_trusted_principal() -> None:
@@ -96,6 +96,26 @@ def test_developer_token_has_only_debug_read_scope() -> None:
     assert PermissionScope.AGENT_CHAT not in principal.scopes
     assert PermissionScope.RETURN_APPROVE not in principal.scopes
     assert PermissionScope.AUDIT_READ not in principal.scopes
+
+
+def test_workflow_recovery_scope_belongs_only_to_operator() -> None:
+    """陈旧执行恢复权限遵循最小授权，不能被业务、审批或调试角色继承。"""
+
+    settings = get_settings()
+    token = create_access_token(
+        settings=settings,
+        subject="operator-001",
+        roles={Role.OPERATOR},
+    )
+
+    principal = decode_access_token(token=token, settings=settings)
+
+    assert PermissionScope.WORKFLOW_RECOVERY in principal.scopes
+    assert {
+        role
+        for role, scopes in ROLE_SCOPE_POLICY.items()
+        if PermissionScope.WORKFLOW_RECOVERY in scopes
+    } == {Role.OPERATOR}
 
 
 def test_expired_token_is_rejected_with_generic_401() -> None:

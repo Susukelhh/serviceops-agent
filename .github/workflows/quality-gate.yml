@@ -23,6 +23,7 @@ concurrency:
 jobs:
   quality-gate:
     # Job 名称适合作为 main 分支保护中的必需状态检查。
+    # 保持既有Required check显示名，避免分支保护因重命名而静默失去约束。
     name: Ruff, Mypy, Pytest and Agent eval
     # Ubuntu Runner 与本地 Windows 形成一次跨平台验证。
     runs-on: ubuntu-latest
@@ -83,14 +84,49 @@ jobs:
           uv run --frozen python examples/13_agent_end_to_end_evaluation.py
           --report data/runtime/agent_end_to_end_report.json
 
-      # 即使前一步质量门失败，只要报告已经生成，就保留逐样本证据用于下载分析。
-      - name: Upload Agent evaluation report
-        if: ${{ always() && hashFiles('data/runtime/agent_end_to_end_report.json') != '' }}
+      # 第48步用18轮金标验证指代、结构化记忆、租约重放和上下文隔离，不调用LLM。
+      - name: Run deterministic conversation stability gate
+        run: >-
+          uv run --frozen python examples/48_conversation_stability_evaluation.py
+          --report data/runtime/conversation_stability_report.json
+
+      # 固定Prometheus镜像摘要；隔离临时TSDB验证15条规则和9个告警/恢复场景。
+      - name: Run Prometheus shadow alert contract drill
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --user 65534:65534 \
+            --volume "$PWD/deploy/observability:/etc/prometheus:ro" \
+            --entrypoint promtool \
+            prom/prometheus@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996 \
+            check rules /etc/prometheus/shadow-alert-rules.yaml
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --user 65534:65534 \
+            --volume "$PWD/deploy/observability:/etc/prometheus:ro" \
+            --entrypoint promtool \
+            prom/prometheus@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996 \
+            test rules /etc/prometheus/shadow-alert-tests.yaml
+
+      # Python层独立验证observe/continue/investigate/rollback与严格阈值边界。
+      - name: Run shadow release action drill
+        run: uv run --frozen python examples/57_shadow_release_drill.py
+
+      # 重新计算规则、测试、策略、应用报告和处置手册哈希，禁止复用过期PASS证据。
+      - name: Verify frozen shadow alert drill evidence
+        run: uv run --frozen python examples/58_verify_shadow_alert_drill_evidence.py
+
+      # 即使前一步质量门失败，只要报告已经生成，就保留低敏逐样本证据用于下载分析。
+      - name: Upload offline evaluation reports
+        if: ${{ always() && (hashFiles('data/runtime/agent_end_to_end_report.json') != '' || hashFiles('data/runtime/conversation_stability_report.json') != '' || hashFiles('data/runtime/conversation_shadow_step57_release_drill.json') != '') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # run_id 让每次产物名唯一，避免多次运行混淆。
-          name: offline-agent-evaluation-${{ github.run_id }}
-          path: data/runtime/agent_end_to_end_report.json
+          name: offline-quality-evaluations-${{ github.run_id }}
+          path: |
+            data/runtime/agent_end_to_end_report.json
+            data/runtime/conversation_stability_report.json
+            data/runtime/conversation_shadow_step57_release_drill.json
           if-no-files-found: error
           # 合成评测报告保留 14 天足够排查，同时控制仓库存储成本。
           retention-days: 14

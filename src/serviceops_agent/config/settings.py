@@ -65,6 +65,17 @@ class Settings(BaseSettings):
     otel_trace_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
     # Metrics 周期导出间隔；过短会增加 Collector 和应用负担。
     otel_metric_export_interval_ms: int = Field(default=60_000, ge=1_000, le=600_000)
+    # 影子评测默认关闭；开启后只复用现有终态，不增加任何LLM调用。
+    conversation_shadow_enabled: bool = False
+    # 稳定哈希采样避免同一请求重试时一会采、一会不采。
+    conversation_shadow_sample_rate: float = Field(default=0.10, ge=0.0, le=1.0)
+    # 候选身份是部署级有限标签；稳定版和候选版不能共享同一个发布判断窗口。
+    conversation_shadow_candidate_id: str = Field(
+        default="local-baseline",
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9][a-z0-9.-]*$",
+    )
 
     # 持久化后端：memory 适合测试；sqlite 适合单机学习；postgres 适合多实例共享数据。
     persistence_backend: Literal["memory", "sqlite", "postgres"] = "sqlite"
@@ -72,6 +83,20 @@ class Settings(BaseSettings):
     checkpoint_database_path: str = "data/runtime/checkpoints.sqlite3"
     # 业务退货申请数据库与 Checkpoint 分库，明确区分工作流状态和真实业务记录。
     business_database_path: str = "data/runtime/serviceops.sqlite3"
+    # 新会话的默认存活天数；过期后仓库拒绝继续创建轮次，避免无限保存用户历史。
+    conversation_ttl_days: int = Field(default=7, ge=1, le=30)
+    # 超过该终态轮次数后生成只含结构化槽位的安全摘要，不复制用户原文或模型答案。
+    conversation_summary_after_turns: int = Field(default=6, ge=2, le=50)
+    # 摘要字符预算同时受领域模型2000字符硬上限保护。
+    conversation_summary_max_chars: int = Field(default=1000, ge=200, le=2000)
+    # 执行者必须在该窗口内持续续租；超时后恢复器才能进入保守处置。
+    lease_duration_seconds: int = Field(default=90, ge=30, le=900)
+    # 心跳至少有三次机会在租约到期前成功，降低短暂抖动导致的误判。
+    heartbeat_interval_seconds: int = Field(default=20, ge=1, le=300)
+    # 到期后额外等待该时间再判为陈旧，吸收数据库与进程调度抖动。
+    stale_grace_seconds: int = Field(default=30, ge=0, le=3600)
+    # 尚未获得执行租约的accepted轮次超过该时间后才允许恢复器检查。
+    accepted_stale_seconds: int = Field(default=60, ge=1, le=3600)
     # PostgreSQL 连接地址同时供业务仓储和 LangGraph Checkpointer 使用；密码不会出现在 repr 中。
     postgres_dsn: SecretStr | None = None
     # 连接池至少保留的连接数；本地默认一条，避免空闲时占用过多数据库资源。
@@ -194,6 +219,11 @@ class Settings(BaseSettings):
         if self.postgres_pool_max_size < self.postgres_pool_min_size:
             # 报错只显示字段关系，不包含任何连接地址或密码。
             raise ValueError("PostgreSQL 最大连接数不能小于最小连接数")
+        if (
+            self.heartbeat_interval_seconds * 3
+            > self.lease_duration_seconds
+        ):
+            raise ValueError("执行租约时长必须至少容纳三次心跳间隔")
         # 启用重排时，候选池不能小于最终返回数，否则没有足够候选可供纠错。
         if self.rag_reranker == "bm25" and self.rag_rerank_candidate_k < self.rag_top_k:
             # 错误只描述字段关系，不包含查询或知识内容。

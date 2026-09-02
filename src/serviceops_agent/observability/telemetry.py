@@ -11,6 +11,7 @@
 # json 生成单行结构化日志；logging 复用项目已有标准库日志调用。
 import json
 import logging
+import re
 
 # sys.stdout 让本地 PyCharm/Uvicorn 控制台可以直接观察 JSON 日志。
 import sys
@@ -129,11 +130,31 @@ capacity_rejection_counter = meter.create_counter(
     unit="1",
     description="Agent 实例因并发容量耗尽而拒绝的业务请求数",
 )
+# 多轮影子观察只按有限意图、终态和解析原因聚合。
+conversation_shadow_counter = meter.create_counter(
+    "serviceops.conversation.shadow.observations",
+    unit="1",
+    description="多轮会话低敏影子观察数",
+)
+# 模型故障、证据拒答和上下文歧义使用有限signal标签。
+conversation_shadow_signal_counter = meter.create_counter(
+    "serviceops.conversation.shadow.signals",
+    unit="1",
+    description="多轮影子评测代理信号数",
+)
+# 安全红线使用固定违规码，不携带请求、会话或业务对象标识。
+conversation_shadow_safety_counter = meter.create_counter(
+    "serviceops.conversation.shadow.safety_violations",
+    unit="1",
+    description="多轮影子评测安全不变量违规数",
+)
 
 # 有限工具白名单也是 Metrics 属性白名单，未知值统一归一化避免基数爆炸。
 SAFE_TOOL_NAMES = frozenset({"get_order_status", "create_return_request"})
 # 意图白名单与领域枚举保持一致，但在可观测层不反向依赖分类实现。
-SAFE_INTENTS = frozenset({"faq", "order_status", "return_request", "unknown"})
+SAFE_INTENTS = frozenset(
+    {"faq", "order_status", "return_request", "human_handoff", "unknown"}
+)
 # 业务终态白名单用于有限指标标签。
 SAFE_OUTCOMES = frozenset(
     {
@@ -145,6 +166,32 @@ SAFE_OUTCOMES = frozenset(
         "clarification",
         "declined",
         "unknown",
+    }
+)
+SAFE_SHADOW_RESOLUTION_REASONS = frozenset(
+    {
+        "explicit_reference",
+        "verified_order_reference",
+        "ambiguous_order_reference",
+        "independent_question",
+    }
+)
+SAFE_SHADOW_SIGNALS = frozenset(
+    {
+        "model_failure",
+        "evidence_abstention",
+        "ambiguous_context",
+        "human_handoff",
+        "safety_violation",
+    }
+)
+SAFE_SHADOW_SAFETY_CODES = frozenset(
+    {
+        "ungrounded_faq_auto_answer",
+        "approval_pending_contains_write_result",
+        "model_failure_without_handoff",
+        "active_order_missing_from_recent_orders",
+        "cross_topic_active_order_retained",
     }
 )
 
@@ -295,6 +342,19 @@ def _build_exporters(settings: Settings) -> tuple[SpanExporter | None, MetricExp
     )
 
 
+def _build_telemetry_resource(settings: Settings) -> Resource:
+    """构造稳定、低基数的服务Resource，覆盖SDK随机实例标识。"""
+
+    return Resource.create(
+        {
+            "service.name": settings.otel_service_name,
+            "service.version": "0.1.0",
+            "service.instance.id": settings.instance_id,
+            "deployment.environment.name": settings.environment,
+        }
+    )
+
+
 def configure_telemetry(settings: Settings) -> TelemetryRuntime | None:
     """幂等配置进程级 Provider、Exporter 与关联 JSON 日志。"""
 
@@ -310,13 +370,7 @@ def configure_telemetry(settings: Settings) -> TelemetryRuntime | None:
             return _telemetry_runtime
 
         # Resource 只包含服务级低基数字段。
-        resource = Resource.create(
-            {
-                "service.name": settings.otel_service_name,
-                "service.version": "0.1.0",
-                "deployment.environment.name": settings.environment,
-            }
-        )
+        resource = _build_telemetry_resource(settings)
         # 上游采样决定优先；没有父 Span 时使用本服务比例。
         sampler = ParentBased(TraceIdRatioBased(settings.otel_trace_sample_ratio))
         # 创建 Trace SDK Provider。
@@ -587,6 +641,63 @@ def record_approval_execution(*, approved: bool, outcome: str) -> None:
         1,
         {"decision": "approved" if approved else "rejected", "outcome": safe_outcome},
     )
+
+
+def record_conversation_shadow_observation(
+    *,
+    candidate_id: str,
+    intent: str,
+    outcome: str,
+    resolution_reason: str,
+    model_failure: bool,
+    evidence_abstention: bool,
+    ambiguous_context: bool,
+    human_handoff: bool,
+    safety_violation_codes: list[str],
+) -> None:
+    """导出一条无高基数标签的多轮影子观察。"""
+
+    safe_candidate_id = (
+        candidate_id
+        if re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,63}", candidate_id)
+        else "unknown"
+    )
+    safe_intent = _normalize_intent(intent)
+    safe_outcome = outcome if outcome in SAFE_OUTCOMES else "unknown"
+    safe_resolution = (
+        resolution_reason
+        if resolution_reason in SAFE_SHADOW_RESOLUTION_REASONS
+        else "unknown"
+    )
+    conversation_shadow_counter.add(
+        1,
+        {
+            "candidate_id": safe_candidate_id,
+            "intent": safe_intent,
+            "outcome": safe_outcome,
+            "resolution.reason": safe_resolution,
+        },
+    )
+    signals = {
+        "model_failure": model_failure,
+        "evidence_abstention": evidence_abstention,
+        "ambiguous_context": ambiguous_context,
+        "human_handoff": human_handoff,
+        # 一个观察不论命中几个违规码都只计一次，供窗口安全违规率作分子。
+        "safety_violation": bool(safety_violation_codes),
+    }
+    for signal, active in signals.items():
+        if active and signal in SAFE_SHADOW_SIGNALS:
+            conversation_shadow_signal_counter.add(
+                1,
+                {"candidate_id": safe_candidate_id, "signal": signal},
+            )
+    for code in sorted(set(safety_violation_codes)):
+        safe_code = code if code in SAFE_SHADOW_SAFETY_CODES else "unknown"
+        conversation_shadow_safety_counter.add(
+            1,
+            {"candidate_id": safe_candidate_id, "violation": safe_code},
+        )
 
 
 def record_outbox_dispatch(*, outcome: str) -> None:

@@ -44,6 +44,7 @@ def test_offline_quality_workflow_never_reads_model_secret() -> None:
     assert "push:" in workflow
     assert "pull_request:" in workflow
     assert "contents: read" in workflow
+    assert "name: Ruff, Mypy, Pytest and Agent eval" in workflow
     # 任何 `${{ secrets.* }}` 都表示 PR 路径可能触达密钥，必须阻断。
     assert "secrets." not in workflow
     # 四个后端开关必须明确固定为零费用确定性实现。
@@ -51,6 +52,21 @@ def test_offline_quality_workflow_never_reads_model_secret() -> None:
     assert "SERVICEOPS_AGENT_PLANNER_BACKEND: deterministic" in workflow
     assert "SERVICEOPS_EMBEDDING_BACKEND: hash" in workflow
     assert "SERVICEOPS_RAG_GENERATION_BACKEND: extractive" in workflow
+    # 第48步多轮状态门必须与单轮整图门一起运行并保留独立低敏报告。
+    assert "examples/48_conversation_stability_evaluation.py" in workflow
+    assert "data/runtime/conversation_stability_report.json" in workflow
+    assert "Run deterministic conversation stability gate" in workflow
+    # 第58步必须使用固定摘要、无网络和非root promtool验证告警，再校验冻结哈希。
+    assert "Run Prometheus shadow alert contract drill" in workflow
+    assert "prom/prometheus@sha256:63805ebb8d2b3920" in workflow
+    assert "--network none" in workflow
+    assert "--read-only" in workflow
+    assert "--user 65534:65534" in workflow
+    assert "promtool" in workflow
+    assert "shadow-alert-tests.yaml" in workflow
+    assert "examples/57_shadow_release_drill.py" in workflow
+    assert "examples/58_verify_shadow_alert_drill_evidence.py" in workflow
+    assert "conversation_shadow_step57_release_drill.json" in workflow
     # 供应链 Action 全部使用不可变完整 SHA。
     _assert_all_actions_use_full_commit_sha(workflow)
 
@@ -71,6 +87,15 @@ def test_qwen_workflow_is_manual_and_requires_paid_confirmation() -> None:
     assert "vars.SERVICEOPS_LLM_MODEL" in workflow
     # 脚本自身的第二层付费保护不能从工作流命令中删除。
     assert "--confirm-paid-api" in workflow
+    # 第49步共享会话真实候选仍只能位于同一个手工付费工作流。
+    assert "examples/49_qwen_multi_turn_experiment.py" in workflow
+    assert "qwen_multi_turn_experiment_report.json" in workflow
+    assert "Run repeated Qwen multi-turn candidate experiment" in workflow
+    # 第50步必须在失败时也重新校验并保存不可覆盖证据，且绑定Git revision。
+    assert "examples/50_archive_qwen_multi_turn_evidence.py" in workflow
+    assert 'if: ${{ always() && hashFiles(' in workflow
+    assert 'source-revision "${{ github.sha }}"' in workflow
+    assert "qwen-multi-turn-evidence-${{ github.run_id }}" in workflow
     assert "contents: read" in workflow
     # 所有拥有 Secret 的第三方 Action 同样必须固定完整 SHA。
     _assert_all_actions_use_full_commit_sha(workflow)

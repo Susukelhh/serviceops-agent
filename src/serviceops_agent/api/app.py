@@ -12,10 +12,10 @@ import logging
 
 # AsyncIterator 标注 FastAPI lifespan；asynccontextmanager 管理异步数据库 Saver。
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
-# timedelta 为公网沙盒身份设置独立短有效期，不复用内部开发 Token 时长。
-from datetime import timedelta
+# UTC/datetime 判断会话生命周期；timedelta 设置会话和公网身份有效期。
+from datetime import UTC, datetime, timedelta
 
 # Path 从已安装 Python 包内部定位随 wheel 一起发布的控制台静态文件。
 from pathlib import Path
@@ -65,6 +65,13 @@ from serviceops_agent.api.schemas import (
     ApprovalDecisionRequest,
     ChatRequest,
     ChatResponse,
+    ConversationCleanupResponse,
+    ConversationCreateResponse,
+    ConversationDetailResponse,
+    ConversationExecutionRecoveryResponse,
+    ConversationMessageRequest,
+    ConversationMessageResponse,
+    ConversationTurnSummary,
     DependencyCheck,
     HealthResponse,
     PublicDemoSessionResponse,
@@ -72,11 +79,26 @@ from serviceops_agent.api.schemas import (
     ThreadDebugResponse,
 )
 
+# 会话上下文服务只从有限安全投影解析指代，不把完整历史直接送入业务图。
+from serviceops_agent.application.conversation_context import prepare_conversation_input
+
+# 长任务执行期间定期续租；一旦无法确认fence就取消并回收本地图任务。
+from serviceops_agent.application.conversation_execution import (
+    run_with_execution_lease_heartbeat,
+)
+
+# 只把工具/证据边界验证后的有限结果合并进结构化会话记忆。
+from serviceops_agent.application.conversation_memory import rebuild_conversation_memory
+from serviceops_agent.application.conversation_shadow import build_shadow_observation
+
 # 协调器把业务事务内的 Outbox 事件至少一次投递到审批审计哈希链。
 from serviceops_agent.application.outbox_reconciler import ReturnOutboxReconciler
 
 # 导入集中配置读取函数，避免 API 模块直接访问零散环境变量。
 from serviceops_agent.config.settings import get_settings
+
+# 工具执行记录与订单结果需要再次领域校验，不能把“尝试查询”误当成“归属已验证”。
+from serviceops_agent.domain.agent import ToolExecutionRecord
 
 # 审计模型生成草案/备注摘要，并限制证据链事件类型。
 from serviceops_agent.domain.audit import (
@@ -85,6 +107,27 @@ from serviceops_agent.domain.audit import (
     build_comment_digest,
     build_proposal_digest,
 )
+
+# 会话轮次使用有限状态机，API只能通过受校验更新对象推进状态。
+from serviceops_agent.domain.conversation import (
+    ConversationDeletionPlan,
+    ConversationRecord,
+    ConversationStatus,
+    ConversationTurnRecord,
+    ConversationTurnStatus,
+    ConversationTurnUpdate,
+    ExecutionKind,
+    ExecutionLeaseState,
+)
+
+# 进入记忆的最近意图必须仍属于图允许的有限枚举。
+from serviceops_agent.domain.enums import Intent
+
+# RAG引用只有在grounded终态下才允许进入可信来源记忆。
+from serviceops_agent.domain.knowledge import Citation
+
+# found=True的订单工具结果才证明订单属于当前已认证用户。
+from serviceops_agent.domain.orders import OrderLookupResult
 
 # 运维补偿接口只返回低敏批次计数，不暴露事件载荷。
 from serviceops_agent.domain.outbox import ReconciliationBatchResult
@@ -108,6 +151,19 @@ from serviceops_agent.infrastructure.audit_repository import (
     InMemoryApprovalAuditRepository,
 )
 
+# 会话API依赖统一仓库协议；可预期的越权和并发冲突映射为固定HTTP错误。
+from serviceops_agent.infrastructure.conversation_repository import (
+    ConversationDeletionBusyError,
+    ConversationIdempotencyConflictError,
+    ConversationLeaseConflictError,
+    ConversationLeaseLostError,
+    ConversationRepository,
+    ConversationTurnConflictError,
+    ConversationUnavailableError,
+    ConversationVersionConflictError,
+    InMemoryConversationRepository,
+)
+
 # Outbox 协议用于 readiness、即时协调和受权运维重试。
 from serviceops_agent.infrastructure.outbox_repository import ReturnOutboxRepository
 
@@ -118,7 +174,7 @@ from serviceops_agent.infrastructure.return_repository import (
 )
 
 # create_agent_runtime 在 Uvicorn lifespan 内选择内存、SQLite 或 PostgreSQL 持久化资源。
-from serviceops_agent.infrastructure.runtime import create_agent_runtime
+from serviceops_agent.infrastructure.runtime import CheckpointDeleter, create_agent_runtime
 
 # 遥测模块配置 Provider、业务 Span、低基数指标和当前 trace_id。
 from serviceops_agent.observability.telemetry import (
@@ -128,6 +184,7 @@ from serviceops_agent.observability.telemetry import (
     record_agent_execution,
     record_approval_execution,
     record_capacity_rejection,
+    record_conversation_shadow_observation,
     start_safe_span,
 )
 
@@ -174,6 +231,10 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.persistence_backend = runtime.persistence_backend
         # 审批和只读审计接口共享同一个与 lifespan 绑定的审计仓库。
         application.state.approval_audit_repository = runtime.approval_audit_repository
+        # 多轮API与后续上下文构建器共享同一会话仓库实例。
+        application.state.conversation_repository = runtime.conversation_repository
+        # 会话删除通过显式最小依赖清理 Checkpoint，不读取编译图内部实现。
+        application.state.checkpoint_deleter = runtime.checkpoint_deleter
         # readiness 使用真实后端仓库执行只读探测。
         application.state.return_request_repository = runtime.return_request_repository
         # 协调器通过同一个具体仓库的 Outbox 协议读取事务事件。
@@ -283,6 +344,20 @@ app.state.service_graph = fallback_service_graph
 app.state.persistence_backend = "memory"
 # 轻量 ASGITransport 测试未进入 lifespan 时使用独立进程内审计仓库。
 app.state.approval_audit_repository = InMemoryApprovalAuditRepository()
+# 无 lifespan 的轻量ASGI测试也需要独立会话仓库，不能复用生产SQLite文件。
+app.state.conversation_repository = InMemoryConversationRepository()
+
+
+class _UnavailableCheckpointDeleter:
+    """未进入 lifespan 时失败关闭，防止业务映射与后备图快照分离。"""
+
+    async def adelete_thread(self, thread_id: str) -> None:
+        _ = thread_id
+        raise RuntimeError("checkpoint deleter requires application lifespan")
+
+
+# 正式运行始终由 AgentRuntime 显式注入同后端 Saver；轻量后备不读取图内部属性。
+app.state.checkpoint_deleter = _UnavailableCheckpointDeleter()
 # 无 lifespan 的轻量测试使用现有默认内存退货仓库完成 readiness。
 app.state.return_request_repository = default_return_request_repository
 # 默认内存退货仓库同时实现 Outbox 协议，支持未进入 lifespan 的轻量测试。
@@ -388,6 +463,18 @@ def _get_approval_audit_repository() -> ApprovalAuditRepository:
         ApprovalAuditRepository,
         app.state.approval_audit_repository,
     )
+
+
+def _get_conversation_repository() -> ConversationRepository:
+    """取得当前运行时的会话、轮次和结构化记忆仓库。"""
+
+    return cast(ConversationRepository, app.state.conversation_repository)
+
+
+def _get_checkpoint_deleter() -> CheckpointDeleter:
+    """取得与当前图共享后端、但只暴露删除能力的 Checkpoint 依赖。"""
+
+    return cast(CheckpointDeleter, app.state.checkpoint_deleter)
 
 
 def _get_return_request_repository() -> ReturnRequestRepository:
@@ -573,14 +660,15 @@ async def get_thread_debug_trace(
     )
 
 
-# readiness 会真实读取五个关键持久化边界；失败时返回 503 而 liveness 仍保持 200。
+# readiness 会真实读取六个关键持久化边界；失败时返回 503 而 liveness 仍保持 200。
 @app.get("/ready", response_model=ReadinessResponse, tags=["system"])
 async def readiness_check(response: Response) -> ReadinessResponse:
-    """验证 Checkpointer、业务仓库、Outbox、审计仓库和 Qdrant 是否可读。"""
+    """验证工作流、会话、业务、Outbox、审计和Qdrant持久化边界。"""
 
     # 固定组件名形成低基数响应；每项初始为 not_ready，只有探测成功才改为 ready。
     checks = {
         "checkpointer": DependencyCheck(status="not_ready"),
+        "conversation_repository": DependencyCheck(status="not_ready"),
         "return_repository": DependencyCheck(status="not_ready"),
         "outbox_repository": DependencyCheck(status="not_ready"),
         "audit_repository": DependencyCheck(status="not_ready"),
@@ -599,6 +687,16 @@ async def readiness_check(response: Response) -> ReadinessResponse:
             "readiness Checkpointer 探测失败: cause_type=%s",
             type(error).__name__,
             extra={"operation": "readiness", "failure_code": "checkpointer"},
+        )
+    try:
+        # 会话索引已成为多轮API必需依赖，执行真实只读计数证明表和连接可访问。
+        _get_conversation_repository().count_conversations()
+        checks["conversation_repository"] = DependencyCheck(status="ready")
+    except Exception as error:
+        logger.warning(
+            "readiness 会话仓库探测失败: cause_type=%s",
+            type(error).__name__,
+            extra={"operation": "readiness", "failure_code": "conversation_repository"},
         )
     try:
         # count() 对内存字典或 SQLite return_requests 表执行真实读取。
@@ -746,6 +844,510 @@ def _build_chat_response(result: dict[str, Any], *, thread_id: str) -> ChatRespo
     )
 
 
+def _conversation_result_fields(result: dict[str, Any]) -> dict[str, Any]:
+    """从图结果提取允许进入轮次业务索引的有限字段。"""
+
+    verified_order_ids: list[str] = []
+    # “工具调用成功”仍可能是found=False；只有重新校验且found=True才证明当前用户拥有该订单。
+    for raw_record in result.get("tool_execution_records", []):
+        try:
+            record = ToolExecutionRecord.model_validate(raw_record)
+            if not record.succeeded or record.tool_name != "get_order_status":
+                continue
+            lookup = OrderLookupResult.model_validate(record.result)
+            if lookup.found and lookup.order_id not in verified_order_ids:
+                verified_order_ids.append(lookup.order_id)
+        except Exception:
+            # 单条损坏记录不能污染记忆；图自己的最终响应边界仍负责安全降级。
+            continue
+    # 退货草案只有在本人订单与签收状态预检查通过后才存在，因此也属于可信订单引用。
+    raw_proposal = result.get("return_request_proposal")
+    if raw_proposal is not None:
+        try:
+            proposal_order_id = ReturnRequestProposal.model_validate(raw_proposal).order_id
+            if proposal_order_id not in verified_order_ids:
+                verified_order_ids.append(proposal_order_id)
+        except Exception:
+            # 损坏草案不能污染会话记忆；审批API仍会在自己的安全边界失败关闭。
+            pass
+    cited_document_ids: list[str] = []
+    # 检索候选本身不等于答案证据，必须同时通过可回答与引用白名单终态。
+    if result.get("faq_answer_grounded") is True:
+        for raw_citation in result.get("citations", []):
+            try:
+                citation = Citation.model_validate(raw_citation)
+                if (
+                    1 <= len(citation.document_id) <= 100
+                    and citation.document_id not in cited_document_ids
+                ):
+                    cited_document_ids.append(citation.document_id)
+            except Exception:
+                continue
+    return {
+        "intent": Intent(str(result["intent"])).value,
+        "verified_order_ids": verified_order_ids,
+        "cited_document_ids": cited_document_ids,
+    }
+
+
+def _synchronize_conversation_memory(
+    *,
+    repository: ConversationRepository,
+    turn: ConversationTurnRecord,
+    owner_user_id: str,
+) -> ConversationRecord | None:
+    """尽力把轮次可信字段合并进记忆；业务结果已完成时不能因索引争用重复执行图。"""
+
+    try:
+        return rebuild_conversation_memory(
+            repository=repository,
+            conversation_id=turn.conversation_id,
+            owner_user_id=owner_user_id,
+            summary_after_turns=settings.conversation_summary_after_turns,
+            summary_max_chars=settings.conversation_summary_max_chars,
+        )
+    except (ConversationUnavailableError, ConversationVersionConflictError) as error:
+        # 不记录用户文本或记忆内容；幂等重放会再次尝试修复该派生索引。
+        logger.warning(
+            "会话结构化记忆同步失败: cause_type=%s",
+            type(error).__name__,
+            extra={"operation": "conversation_memory_sync", "failure_code": "conflict"},
+        )
+        return None
+
+
+def _conversation_message_response(
+    *,
+    chat_response: ChatResponse,
+    turn: ConversationTurnRecord,
+    replayed: bool,
+) -> ConversationMessageResponse:
+    """把现有单轮响应扩展为具有稳定多轮定位信息的响应。"""
+
+    return ConversationMessageResponse(
+        **chat_response.model_dump(),
+        conversation_id=turn.conversation_id,
+        turn_id=turn.turn_id,
+        sequence_number=turn.sequence_number,
+        replayed=replayed,
+    )
+
+
+async def _delete_prepared_conversation_artifacts(
+    *,
+    repository: ConversationRepository,
+    plan: ConversationDeletionPlan,
+) -> bool:
+    """先删全部 Checkpoint，再删除仍处于关闭状态的业务映射。"""
+
+    checkpoint_deleter = _get_checkpoint_deleter()
+    # 每个工作流线程独立删除；任一失败都会中止物理业务删除，保留计划供重试。
+    for workflow_thread_id in plan.workflow_thread_ids:
+        await checkpoint_deleter.adelete_thread(str(workflow_thread_id))
+    return repository.delete_prepared_conversation(plan=plan)
+
+
+@app.post(
+    "/api/v1/conversations",
+    response_model=ConversationCreateResponse,
+    status_code=201,
+    tags=["conversation"],
+)
+async def create_conversation(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.AGENT_CHAT.value]),
+    ],
+) -> ConversationCreateResponse:
+    """为当前已认证用户创建一段有过期时间的多轮会话。"""
+
+    record = _get_conversation_repository().create_conversation(
+        owner_user_id=principal.subject,
+        expires_at=datetime.now(UTC) + timedelta(days=settings.conversation_ttl_days),
+    )
+    return ConversationCreateResponse(
+        conversation_id=record.conversation_id,
+        status=record.status,
+        memory_version=record.memory.memory_version,
+        created_at=record.created_at,
+        expires_at=record.expires_at,
+    )
+
+
+@app.get(
+    "/api/v1/conversations/{conversation_id}",
+    response_model=ConversationDetailResponse,
+    tags=["conversation"],
+)
+async def get_conversation(
+    conversation_id: UUID,
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.AGENT_CHAT.value]),
+    ],
+) -> ConversationDetailResponse:
+    """只向会话所有者返回元数据和最近20轮的有限公开字段。"""
+
+    repository = _get_conversation_repository()
+    record = repository.get_conversation_for_owner(
+        conversation_id=conversation_id,
+        owner_user_id=principal.subject,
+    )
+    # 不存在、越权、关闭和过期统一为404，避免通过响应差异枚举其他用户会话。
+    if (
+        record is None
+        or record.status != ConversationStatus.ACTIVE
+        or record.expires_at <= datetime.now(UTC)
+    ):
+        raise HTTPException(status_code=404, detail="未找到可用会话")
+    turns = repository.list_recent_turns(
+        conversation_id=conversation_id,
+        owner_user_id=principal.subject,
+        limit=20,
+    )
+    return ConversationDetailResponse(
+        conversation_id=record.conversation_id,
+        status=record.status,
+        memory_version=record.memory.memory_version,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        expires_at=record.expires_at,
+        turns=[
+            ConversationTurnSummary(
+                turn_id=turn.turn_id,
+                workflow_thread_id=turn.workflow_thread_id,
+                sequence_number=turn.sequence_number,
+                status=turn.status,
+                user_message=turn.user_message,
+                standalone_question=turn.standalone_question,
+                assistant_answer=turn.assistant_answer,
+                created_at=turn.created_at,
+                updated_at=turn.updated_at,
+            )
+            for turn in turns
+        ],
+    )
+
+
+@app.delete(
+    "/api/v1/conversations/{conversation_id}",
+    status_code=204,
+    tags=["conversation"],
+)
+async def delete_conversation(
+    conversation_id: UUID,
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.AGENT_CHAT.value]),
+    ],
+) -> Response:
+    """幂等删除当前用户会话及其全部工作流 Checkpoint。"""
+
+    repository = _get_conversation_repository()
+    try:
+        plan = repository.prepare_conversation_deletion(
+            conversation_id=conversation_id,
+            owner_user_id=principal.subject,
+        )
+    except ConversationDeletionBusyError as error:
+        # 只有确认为所有者且有工作流正在执行时才返回冲突；其他情况统一 204。
+        raise HTTPException(status_code=409, detail="会话仍有消息正在处理中") from error
+    except Exception as error:
+        # 数据仓库暂时不可用时不泄漏驱动异常、连接地址或目标会话是否存在。
+        logger.warning(
+            "会话隐私删除准备失败: cause_type=%s",
+            type(error).__name__,
+            extra={
+                "operation": "conversation_delete",
+                "failure_code": "prepare",
+            },
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="会话清理暂未完成，请稍后重试",
+            headers={"Retry-After": "1"},
+        ) from error
+    if plan is None:
+        # 不存在、越权和已经成功删除使用相同响应，避免会话标识枚举。
+        return Response(status_code=204)
+    try:
+        deleted = await _delete_prepared_conversation_artifacts(
+            repository=repository,
+            plan=plan,
+        )
+        if not deleted:
+            # Checkpoint 已清理但映射状态不再符合计划时不能谎报完整隐私删除成功。
+            raise RuntimeError("prepared conversation mapping was not deleted")
+    except Exception as error:
+        # prepare 已关闭会话；不删除业务映射，下一次相同请求可从完整线程清单重试。
+        logger.warning(
+            "会话隐私删除暂未完成: cause_type=%s",
+            type(error).__name__,
+            extra={
+                "operation": "conversation_delete",
+                "failure_code": "checkpoint_or_mapping",
+            },
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="会话清理暂未完成，请稍后重试",
+            headers={"Retry-After": "1"},
+        ) from error
+    return Response(status_code=204)
+
+
+@app.post(
+    "/api/v1/conversations/{conversation_id}/messages",
+    response_model=ConversationMessageResponse,
+    tags=["conversation"],
+)
+async def send_conversation_message(
+    conversation_id: UUID,
+    request: ConversationMessageRequest,
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.AGENT_CHAT.value]),
+    ],
+) -> ConversationMessageResponse:
+    """幂等地创建并执行一轮独立工作流，或重放已经持久化的结果。"""
+
+    if (
+        _is_public_demo_principal(principal)
+        and len(request.message) > settings.public_demo_max_message_chars
+    ):
+        raise HTTPException(status_code=413, detail="演示问题过长，请缩短后重试")
+    repository = _get_conversation_repository()
+    try:
+        turn, replayed = repository.create_or_get_turn(
+            conversation_id=conversation_id,
+            owner_user_id=principal.subject,
+            idempotency_key=request.idempotency_key,
+            user_message=request.message,
+        )
+    except ConversationUnavailableError as error:
+        raise HTTPException(status_code=404, detail="未找到可用会话") from error
+    except ConversationIdempotencyConflictError as error:
+        raise HTTPException(status_code=409, detail="幂等键已用于另一条消息") from error
+
+    graph = _get_service_graph()
+    thread_id = str(turn.workflow_thread_id)
+    graph_config = _build_thread_config(thread_id)
+
+    # 已完成或等待审批的HTTP重试直接读取同一Checkpoint，不再次调用模型或业务工具。
+    if replayed and turn.status in {
+        ConversationTurnStatus.COMPLETED,
+        ConversationTurnStatus.WAITING_APPROVAL,
+    }:
+        execution_lease = repository.get_turn_execution_lease(turn_id=turn.turn_id)
+        if (
+            turn.status == ConversationTurnStatus.WAITING_APPROVAL
+            and execution_lease is not None
+        ):
+            if execution_lease.state == ExecutionLeaseState.ACTIVE:
+                raise HTTPException(status_code=409, detail="该会话审批正在处理中")
+            if (
+                execution_lease.kind == ExecutionKind.APPROVAL_RESUME
+                and execution_lease.state
+                == ExecutionLeaseState.RECONCILIATION_REQUIRED
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="该会话审批需要运维对账，不能自动恢复",
+                )
+        snapshot = await graph.aget_state(graph_config)
+        if not snapshot.values:
+            raise HTTPException(status_code=409, detail="轮次结果暂时不可恢复")
+        replay_result = dict(snapshot.values)
+        replay_result["__interrupt__"] = snapshot.interrupts
+        chat_response = _build_chat_response(replay_result, thread_id=thread_id)
+        # 审批接口可能已恢复工作流；重放时顺便把会话索引从等待态推进到完成态。
+        if (
+            turn.status == ConversationTurnStatus.WAITING_APPROVAL
+            and not chat_response.approval_required
+            and not snapshot.next
+            and not snapshot.interrupts
+        ):
+            result_fields = _conversation_result_fields(replay_result)
+            # 并发重放可能已经完成同一修复；响应仍来自唯一Checkpoint结果。
+            with suppress(ConversationTurnConflictError):
+                turn = repository.advance_turn(
+                    conversation_id=conversation_id,
+                    turn_id=turn.turn_id,
+                    owner_user_id=principal.subject,
+                    update=ConversationTurnUpdate(
+                        expected_status=ConversationTurnStatus.WAITING_APPROVAL,
+                        status=ConversationTurnStatus.COMPLETED,
+                        standalone_question=turn.standalone_question or request.message,
+                        assistant_answer=chat_response.answer,
+                        **result_fields,
+                    ),
+                )
+        _synchronize_conversation_memory(
+            repository=repository,
+            turn=turn,
+            owner_user_id=principal.subject,
+        )
+        return _conversation_message_response(
+            chat_response=chat_response,
+            turn=turn,
+            replayed=True,
+        )
+
+    if replayed and turn.status in {
+        ConversationTurnStatus.RUNNING,
+        ConversationTurnStatus.FAILED,
+    }:
+        detail = (
+            "该轮消息仍在处理中"
+            if turn.status == ConversationTurnStatus.RUNNING
+            else "该轮消息此前执行失败，请使用新的幂等键重试"
+        )
+        raise HTTPException(status_code=409, detail=detail)
+
+    try:
+        execution_lease = repository.claim_turn_execution(
+            conversation_id=conversation_id,
+            turn_id=turn.turn_id,
+            owner_user_id=principal.subject,
+            execution_kind=ExecutionKind.INITIAL,
+            lease_seconds=settings.lease_duration_seconds,
+        )
+    except ConversationLeaseConflictError as error:
+        raise HTTPException(status_code=409, detail="该轮消息已被其他请求接管") from error
+
+    request_id = str(uuid4())
+    standalone_question = request.message
+    try:
+        resolution = prepare_conversation_input(
+            repository=repository,
+            conversation_id=conversation_id,
+            owner_user_id=principal.subject,
+            before_sequence=turn.sequence_number,
+            message=request.message,
+        )
+        standalone_question = resolution.standalone_question
+        with start_safe_span(
+            "serviceops.agent.conversation_turn",
+            attributes={
+                "serviceops.request.id": request_id,
+                "serviceops.thread.id": thread_id,
+                "serviceops.conversation.id": str(conversation_id),
+                "serviceops.operation": "conversation_turn",
+            },
+        ):
+            started_at = perf_counter()
+            result, execution_lease = await run_with_execution_lease_heartbeat(
+                repository=repository,
+                conversation_id=conversation_id,
+                owner_user_id=principal.subject,
+                lease=execution_lease,
+                lease_seconds=settings.lease_duration_seconds,
+                heartbeat_interval_seconds=settings.heartbeat_interval_seconds,
+                work=graph.ainvoke(
+                    {
+                        "request_id": request_id,
+                        "user_id": principal.subject,
+                        # 图只处理已解析的独立问题；原始消息仍单独保存在会话轮次中。
+                        "user_message": standalone_question,
+                        "idempotency_key": request.idempotency_key,
+                        "events": [
+                            "api:authenticated_conversation_turn_received",
+                            f"conversation:resolution_{resolution.reason.value}",
+                        ],
+                    },
+                    config=graph_config,
+                ),
+            )
+            record_agent_execution(
+                operation="conversation_turn",
+                result=result,
+                duration_ms=(perf_counter() - started_at) * 1_000,
+            )
+            chat_response = _build_chat_response(result, thread_id=thread_id)
+    except (ConversationLeaseLostError, ConversationLeaseConflictError) as error:
+        # 恢复器已经递增代次时不能再把本地结果或失败覆盖到权威轮次。
+        raise HTTPException(
+            status_code=409,
+            detail="该轮执行权已经失效，请查询轮次状态后重试",
+        ) from error
+    except Exception:
+        # 图异常必须留下终态，避免同一幂等键在未知状态下自动重复副作用。
+        with suppress(ConversationLeaseLostError, ConversationLeaseConflictError):
+            repository.finish_turn_execution(
+                conversation_id=conversation_id,
+                owner_user_id=principal.subject,
+                lease=execution_lease,
+                update=ConversationTurnUpdate(
+                    expected_status=ConversationTurnStatus.RUNNING,
+                    status=ConversationTurnStatus.FAILED,
+                    standalone_question=standalone_question,
+                ),
+            )
+        raise
+
+    result_fields = _conversation_result_fields(result)
+    terminal_status = (
+        ConversationTurnStatus.WAITING_APPROVAL
+        if chat_response.approval_required
+        else ConversationTurnStatus.COMPLETED
+    )
+    try:
+        turn = repository.finish_turn_execution(
+            conversation_id=conversation_id,
+            owner_user_id=principal.subject,
+            lease=execution_lease,
+            update=ConversationTurnUpdate(
+                expected_status=ConversationTurnStatus.RUNNING,
+                status=terminal_status,
+                standalone_question=standalone_question,
+                assistant_answer=chat_response.answer,
+                **result_fields,
+            ),
+        )
+    except (ConversationLeaseLostError, ConversationLeaseConflictError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail="该轮执行权已经失效，请查询轮次状态后重试",
+        ) from error
+    synchronized_conversation = _synchronize_conversation_memory(
+        repository=repository,
+        turn=turn,
+        owner_user_id=principal.subject,
+    )
+    shadow_observation = build_shadow_observation(
+        request_id=request_id,
+        result=result,
+        resolution_reason=resolution.reason,
+        turn=turn,
+        memory=(
+            synchronized_conversation.memory
+            if synchronized_conversation is not None
+            else None
+        ),
+        enabled=settings.conversation_shadow_enabled,
+        sample_rate=settings.conversation_shadow_sample_rate,
+    )
+    if shadow_observation is not None:
+        record_conversation_shadow_observation(
+            candidate_id=settings.conversation_shadow_candidate_id,
+            intent=shadow_observation.intent,
+            outcome=shadow_observation.outcome.value,
+            resolution_reason=shadow_observation.resolution_reason.value,
+            model_failure=shadow_observation.model_failure,
+            evidence_abstention=shadow_observation.evidence_abstention,
+            ambiguous_context=shadow_observation.ambiguous_context,
+            human_handoff=(
+                shadow_observation.outcome.value == "human_handoff"
+            ),
+            safety_violation_codes=shadow_observation.safety_violation_codes,
+        )
+    return _conversation_message_response(
+        chat_response=chat_response,
+        turn=turn,
+        replayed=False,
+    )
+
+
 # 注册工单入口；FastAPI 会先把 JSON 请求体校验并转换为 ChatRequest。
 @app.post("/api/v1/chat", response_model=ChatResponse, tags=["agent"])
 async def chat(
@@ -849,6 +1451,28 @@ async def review_return_request(
         principal=principal,
         state_values=snapshot.values,
     )
+    # 会话线程的审批执行权独立于业务状态；先识别活动/隔离租约，避免把恢复中的
+    # 中间Checkpoint误判为“不在等待审批”并再次调用Command.resume。
+    conversation_repository = _get_conversation_repository()
+    conversation_turn = conversation_repository.get_turn_by_workflow_thread(
+        workflow_thread_id=thread_id,
+    )
+    if conversation_turn is not None:
+        existing_lease = conversation_repository.get_turn_execution_lease(
+            turn_id=conversation_turn.turn_id,
+        )
+        if existing_lease is not None:
+            if existing_lease.state == ExecutionLeaseState.ACTIVE:
+                raise HTTPException(status_code=409, detail="该会话审批正在处理中")
+            if (
+                existing_lease.kind == ExecutionKind.APPROVAL_RESUME
+                and existing_lease.state
+                == ExecutionLeaseState.RECONCILIATION_REQUIRED
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="该会话审批需要运维对账，不能自动恢复",
+                )
     # 只有暂停在指定审批节点且确实包含 interrupt 时才允许恢复。
     if "request_return_approval" not in snapshot.next or not snapshot.interrupts:
         # 已完成或不是审批流程的线程不能重复执行写操作。
@@ -864,6 +1488,10 @@ async def review_return_request(
         # 防止损坏快照把 None 或空字符串静默转换为可用标识。
         if not original_request_id or original_request_id == "None":
             raise ValueError("Checkpoint 缺少 request_id")
+        # 初始user_id来自申请人的验签JWT；审批恢复值不能覆盖它。
+        original_user_id = str(snapshot.values["user_id"])
+        if not original_user_id or original_user_id == "None":
+            raise ValueError("Checkpoint 缺少 user_id")
     # 损坏或被错误迁移的快照不能进入审批恢复和业务写工具。
     except Exception as error:
         # 客户端只收到固定故障信息，不泄漏 Checkpoint 原始字段。
@@ -871,6 +1499,25 @@ async def review_return_request(
             status_code=500,
             detail="待审批草案校验失败",
         ) from error
+
+    # 旧版/chat线程没有会话映射，继续兼容；新版会话线程必须验证Checkpoint用户与所有者一致。
+    if conversation_turn is not None:
+        owner_conversation = conversation_repository.get_conversation_for_owner(
+            conversation_id=conversation_turn.conversation_id,
+            owner_user_id=original_user_id,
+        )
+        if owner_conversation is None:
+            raise HTTPException(status_code=500, detail="会话审批归属校验失败")
+        if (
+            owner_conversation.status != ConversationStatus.ACTIVE
+            or owner_conversation.expires_at <= datetime.now(UTC)
+        ):
+            raise HTTPException(status_code=409, detail="会话已关闭或过期，不能继续审批")
+        # 草案幂等键必须与原会话轮次一致，防止错配Checkpoint恢复到另一业务请求。
+        if proposal.idempotency_key != conversation_turn.idempotency_key:
+            raise HTTPException(status_code=500, detail="会话审批幂等校验失败")
+        if conversation_turn.status != ConversationTurnStatus.WAITING_APPROVAL:
+            raise HTTPException(status_code=409, detail="会话轮次当前不在等待审批")
 
     # 审批人身份来自有 return:approve 权限的 JWT sub，不能由请求 JSON 伪造。
     decision = ApprovalDecision(
@@ -909,13 +1556,32 @@ async def review_return_request(
             },
         ):
             # 同主体、决定、草案和备注的重复追加会安全返回原事件。
-            audit_repository.append(decision_audit_draft)
+            decision_audit_event, _ = audit_repository.append(decision_audit_draft)
     # 同一线程试图更换主体、决定或备注时不能恢复原 interrupt。
     except ApprovalAuditConflictError as error:
         raise HTTPException(
             status_code=409,
             detail="该线程已经记录了不同的审批决定",
         ) from error
+
+    # 会话线程用独立审批租约认领恢复权；业务状态保持waiting_approval，避免与初始
+    # running阶段混淆。旧版/chat没有轮次映射，继续沿用原兼容路径。
+    approval_execution_lease = None
+    if conversation_turn is not None:
+        try:
+            approval_execution_lease = conversation_repository.claim_turn_execution(
+                conversation_id=conversation_turn.conversation_id,
+                turn_id=conversation_turn.turn_id,
+                owner_user_id=original_user_id,
+                execution_kind=ExecutionKind.APPROVAL_RESUME,
+                lease_seconds=settings.lease_duration_seconds,
+                decision_audit_event_id=decision_audit_event.audit_event_id,
+            )
+        except ConversationLeaseConflictError as error:
+            raise HTTPException(
+                status_code=409,
+                detail="该会话审批已被其他请求接管",
+            ) from error
 
     try:
         # 审批恢复业务 Span 成为重放节点和后续写工具节点 Span 的父节点。
@@ -931,19 +1597,53 @@ async def review_return_request(
             # 使用单调时钟测量恢复图耗时。
             approval_started_at = perf_counter()
             # Command.resume 会让 request_return_approval 节点从头重放并取得该决定。
-            result = await graph.ainvoke(
+            resume_work = graph.ainvoke(
                 # 恢复值只含批准布尔值、审批人和备注，不允许携带用户身份或工具参数。
                 Command(resume=decision.model_dump(mode="json")),
                 # 同一个配置保证恢复原草案、可信身份和幂等键。
                 config=graph_config,
             )
+            if approval_execution_lease is None:
+                # 旧版/chat没有conversation_turn，只保留原有兼容执行语义。
+                result = await resume_work
+            else:
+                assert conversation_turn is not None
+                result, approval_execution_lease = (
+                    await run_with_execution_lease_heartbeat(
+                        repository=conversation_repository,
+                        conversation_id=conversation_turn.conversation_id,
+                        owner_user_id=original_user_id,
+                        lease=approval_execution_lease,
+                        lease_seconds=settings.lease_duration_seconds,
+                        heartbeat_interval_seconds=settings.heartbeat_interval_seconds,
+                        work=resume_work,
+                    )
+                )
             # 与 chat 共用有限 intent/outcome/tool 业务指标。
             record_agent_execution(
                 operation="approval",
                 result=result,
                 duration_ms=(perf_counter() - approval_started_at) * 1_000,
             )
-    except Exception:
+    except (ConversationLeaseLostError, ConversationLeaseConflictError) as error:
+        # 审批恢复可能已经发生业务提交；失权后只能隔离对账，不能伪造失败终态。
+        raise HTTPException(
+            status_code=409,
+            detail="该会话审批执行权已失效，需要运维对账",
+        ) from error
+    except Exception as error:
+        if conversation_turn is not None:
+            # 无法仅凭异常判断退货事务、Outbox或Checkpoint是否已提交。保留活动租约，
+            # 到期后由恢复器fence为reconciliation_required，绝不自动二次resume。
+            logger.warning(
+                "会话审批执行结果不确定: cause_type=%s",
+                type(error).__name__,
+                extra={
+                    "operation": "conversation_approval_resume",
+                    "failure_code": "uncertain",
+                },
+            )
+            raise
         # 恢复或写工具抛出异常时追加失败终态，保留已提交决定的完整因果关系。
         failure_audit_draft = _build_approval_audit_draft(
             thread_id=stable_thread_id,
@@ -1024,7 +1724,165 @@ async def review_return_request(
         outcome=final_workflow_status.value,
     )
     # 批准会返回创建结果，拒绝会返回零写入结果；两者使用同一响应契约。
-    return _build_chat_response(result, thread_id=stable_thread_id)
+    chat_response = _build_chat_response(result, thread_id=stable_thread_id)
+    if conversation_turn is not None:
+        if approval_execution_lease is None:
+            raise HTTPException(status_code=500, detail="会话审批租约状态异常")
+        result_fields = _conversation_result_fields(result)
+        try:
+            conversation_turn = conversation_repository.finish_turn_execution(
+                conversation_id=conversation_turn.conversation_id,
+                owner_user_id=original_user_id,
+                lease=approval_execution_lease,
+                update=ConversationTurnUpdate(
+                    expected_status=ConversationTurnStatus.WAITING_APPROVAL,
+                    status=ConversationTurnStatus.COMPLETED,
+                    standalone_question=(
+                        conversation_turn.standalone_question
+                        or conversation_turn.user_message
+                    ),
+                    assistant_answer=chat_response.answer,
+                    **result_fields,
+                ),
+            )
+        except (ConversationLeaseLostError, ConversationLeaseConflictError) as error:
+            # 图或业务写可能已经成功，旧代次不能用无fence更新覆盖；进入人工对账。
+            raise HTTPException(
+                status_code=409,
+                detail="该会话审批结果需要运维对账",
+            ) from error
+        if (
+            conversation_turn is not None
+            and conversation_turn.status == ConversationTurnStatus.COMPLETED
+        ):
+            _synchronize_conversation_memory(
+                repository=conversation_repository,
+                turn=conversation_turn,
+                owner_user_id=original_user_id,
+            )
+        else:
+            logger.warning(
+                "审批完成后会话轮次索引未同步",
+                extra={
+                    "operation": "conversation_approval_sync",
+                    "failure_code": "turn_conflict",
+                },
+            )
+    return chat_response
+
+
+# 会话清理与普通用户删除共用“先Checkpoint、后业务映射”的失败关闭顺序。
+@app.post(
+    "/api/v1/internal/conversations/cleanup",
+    response_model=ConversationCleanupResponse,
+    tags=["operations"],
+)
+async def cleanup_expired_conversations(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(
+            require_principal,
+            scopes=[PermissionScope.CONVERSATION_CLEANUP.value],
+        ),
+    ],
+    limit: Annotated[int, Query(ge=1, le=1_000)] = 100,
+) -> ConversationCleanupResponse:
+    """清理一批到期或先前失败关闭的会话，并只返回聚合计数。"""
+
+    # principal 只用于 Scope 校验，不进入日志、指标或清理计划。
+    _ = principal
+    repository = _get_conversation_repository()
+    try:
+        plans = repository.prepare_expired_conversation_deletions(
+            now=datetime.now(UTC),
+            limit=limit,
+        )
+    except Exception as error:
+        logger.warning(
+            "会话清理计划读取失败: cause_type=%s",
+            type(error).__name__,
+            extra={
+                "operation": "conversation_cleanup",
+                "failure_code": "prepare_batch",
+            },
+        )
+        raise HTTPException(status_code=503, detail="会话清理服务暂不可用") from error
+
+    deleted_count = 0
+    failed_count = 0
+    for plan in plans:
+        try:
+            deleted = await _delete_prepared_conversation_artifacts(
+                repository=repository,
+                plan=plan,
+            )
+        except Exception as error:
+            failed_count += 1
+            # 不记录 conversation_id、owner 或 thread_id，批处理结果也不返回这些标识。
+            logger.warning(
+                "单个会话清理失败: cause_type=%s",
+                type(error).__name__,
+                extra={
+                    "operation": "conversation_cleanup",
+                    "failure_code": "checkpoint_or_mapping",
+                },
+            )
+            continue
+        if deleted:
+            deleted_count += 1
+        else:
+            # 计划状态被并发改变时失败关闭；后续批次可根据仓库状态再次判断。
+            failed_count += 1
+    return ConversationCleanupResponse(
+        scanned_count=len(plans),
+        deleted_count=deleted_count,
+        failed_count=failed_count,
+    )
+
+
+# 陈旧工作流恢复与生命周期删除分权；它只做fence/分类，不读取或返回业务正文。
+@app.post(
+    "/api/v1/internal/conversations/recover-stale",
+    response_model=ConversationExecutionRecoveryResponse,
+    tags=["operations"],
+)
+async def recover_stale_conversation_executions(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(
+            require_principal,
+            scopes=[PermissionScope.WORKFLOW_RECOVERY.value],
+        ),
+    ],
+    limit: Annotated[int, Query(ge=1, le=1_000)] = 100,
+) -> ConversationExecutionRecoveryResponse:
+    """Fence陈旧初始执行并隔离状态不确定的审批恢复。"""
+
+    # principal只用于Scope校验；恢复扫描和响应都不携带操作者或业务标识。
+    _ = principal
+    repository = _get_conversation_repository()
+    try:
+        with start_safe_span(
+            "serviceops.conversation.recover_stale",
+            attributes={"serviceops.conversation.recovery_batch_limit": limit},
+        ):
+            result = repository.recover_stale_turn_executions(
+                now=datetime.now(UTC),
+                grace_seconds=settings.stale_grace_seconds,
+                accepted_stale_seconds=settings.accepted_stale_seconds,
+                limit=limit,
+            )
+    except Exception as error:
+        logger.warning(
+            "陈旧工作流恢复失败: cause_type=%s",
+            type(error).__name__,
+            extra={
+                "operation": "conversation_execution_recovery",
+                "failure_code": "batch",
+            },
+        )
+        raise HTTPException(status_code=503, detail="工作流恢复服务暂不可用") from error
+    return ConversationExecutionRecoveryResponse.model_validate(result)
 
 
 # 运维补偿接口与审批/审计接口职责分离，只允许推进 pending Outbox 状态。

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RAG评价指标：面试够用版</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#17232d;--muted:#63717d;--blue:#285dc2;--green:#13734c;--red:#a33d32;--line:#dbe4ea;--paper:#fff}
+    *{box-sizing:border-box}body{margin:0;background:#edf2f5;color:var(--ink)}main{width:min(1080px,calc(100% - 28px));margin:26px auto;padding:38px;background:var(--paper);border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 50px rgba(20,40,60,.08)}
+    h1{margin:0;font:700 39px Georgia,"Songti SC",serif}.lead{font-size:18px;color:var(--muted)}h2{margin-top:30px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.card{padding:18px;border:1px solid var(--line);border-radius:14px}.card h3{margin:0 0 8px;color:var(--blue)}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f5f8fa}.good{color:var(--green);font-weight:700}.bad{color:var(--red);font-weight:700}.note{padding:18px;border-left:4px solid var(--blue);border-radius:10px;background:#f1f5ff}.formula{font-family:Consolas,monospace;background:#f4f6f8;padding:2px 6px;border-radius:5px}.quiz{padding:18px;background:#fff8e9;border:1px solid #eed99b;border-radius:14px}a{color:#285dc2}@media(max-width:720px){.grid{grid-template-columns:1fr}main{padding:24px}}@media print{body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none}.card{break-inside:avoid}}
+  </style>
+</head>
+<body><main>
+  <h1>RAG 评价指标：面试够用版</h1>
+  <p class="lead">第24课 · 不背一串缩写，而是判断问题出在“找资料、排资料、答问题，还是系统运行”。</p>
+
+  <section class="note"><strong>先记住总图：</strong>检索指标回答“资料找得对不对”；生成指标回答“模型有没有根据资料正确作答”；业务与工程指标回答“该拒答时能否拒答，以及线上是否又快、又稳、成本可控”。</section>
+
+  <h2>一、四层指标</h2>
+  <div class="grid">
+    <section class="card"><h3>1. 找没找到</h3><p><b>Recall@K / Hit@K</b>：正确资料有没有进入前 K。适合诊断漏召回。</p><p><b>Precision@K</b>：前 K 里有多少真相关。适合诊断上下文噪声。</p></section>
+    <section class="card"><h3>2. 排得靠不靠前</h3><p><b>Top-1</b>：第一名是否正确。</p><p><b>MRR@K</b>：只看首个相关结果的名次；第一名得1，第二名得0.5。</p><p><b>nDCG@K</b>：同时考虑多个相关结果和位置，越靠前贡献越大。</p></section>
+    <section class="card"><h3>3. 答得是否可信</h3><p><b>Answer Correctness</b>：答案与人工参考答案是否一致。</p><p><b>Faithfulness / Groundedness</b>：答案中的主张能否由检索证据支持。</p><p><b>Answer Relevance</b>：是否真正回答用户问题。</p><p><b>Citation Validity</b>：引用是否存在、合法并来自本轮证据。</p></section>
+    <section class="card"><h3>4. 能否安全上线</h3><p><b>FPR</b>：本不该检索或回答的问题，被错误放行的比例。</p><p><b>Abstention Accuracy</b>：知识不足时正确拒答的比例。</p><p><b>Unsupported Answer Rate</b>：无充分证据却仍回答的比例。</p><p><b>P95、错误率、Token/费用</b>：大多数用户之外的慢请求、稳定性和成本。</p></section>
+  </div>
+
+  <h2>二、项目中的真实口径</h2>
+  <table><thead><tr><th>指标</th><th>项目如何计算</th><th>面试时怎么解释</th></tr></thead><tbody>
+    <tr><td>Recall@K</td><td>正例问题中，Top-K 至少出现一个期望文档的比例</td><td>这是问题级命中率，严格说接近 Hit@K；不是逐文档的传统 Recall</td></tr>
+    <tr><td>Top-1</td><td>正例中首个结果就是期望文档的比例</td><td>比 Recall@5 更能反映送入生成器的首条证据质量</td></tr>
+    <tr><td>MRR@K</td><td>全部正例的首个相关排名倒数均值</td><td>适合比较 Rerank 前后是否把正确资料前移</td></tr>
+    <tr><td>nDCG@K</td><td>对所有已标注相关文档按排名折损，再与理想排名归一化</td><td>适合存在多个相关文档的查询</td></tr>
+    <tr><td>Decision Accuracy / FPR</td><td>正例命中与负例拒绝共同计分；负例有任意结果即误召回</td><td>防止靠降低阈值、什么都召回来制造高 Recall</td></tr>
+    <tr><td>Answerable Recall / Abstention</td><td>有答案时是否回答；无答案时是否拒答</td><td>防止“全部拒答”制造虚假安全</td></tr>
+    <tr><td>Unsupported / Citation</td><td>知识缺口是否被乱答；引用ID是否属于本轮候选白名单</td><td>这是项目的可执行幻觉控制口径</td></tr>
+  </tbody></table>
+
+  <h2>三、我们的实验真正说明了什么</h2>
+  <table><thead><tr><th>实验</th><th>关键结果</th><th>结论</th></tr></thead><tbody>
+    <tr><td>旧 RAG 基线</td><td>Recall@5 100%，Top-1 87.5%，MRR 93.1%，FPR 100%</td><td class="bad">会找资料，但对域外问题什么都找，不能上线</td></tr>
+    <tr><td>范围门</td><td>锁定集 Recall 100%，Decision 100%，FPR 0%</td><td class="good">把“是否该检索”与“检索什么”拆开是有效优化</td></tr>
+    <tr><td>候选内 BM25 重排</td><td>Top-1 90%→100%，MRR 95%→100%，Recall 保持100%</td><td class="good">证明改善的是排序，不是召回</td></tr>
+    <tr><td>千问语义向量</td><td>锁定正例 Recall/Top-1 100%，但 FPR 50%</td><td class="bad">语义更强不等于整体可晋级</td></tr>
+    <tr><td>Qdrant+BM25+RRF</td><td>锁定 Recall 100%，Top-1 91.67%，MRR 95.83%，FPR 50%</td><td class="bad">完整混合召回已实现，但冻结候选未通过质量门</td></tr>
+    <tr><td>端到端 Grounded RAG</td><td>Answerable 100%，Abstention 100%，Unsupported 0%，Citation 100%</td><td class="good">在12条一次性锁定题上通过；样本小，不能冒充线上普遍效果</td></tr>
+  </tbody></table>
+
+  <h2>四、面试官最关心的不是公式</h2>
+  <ol>
+    <li>你的标签怎么来的？按文档还是 Chunk 标注？一题可有几个相关来源？</li>
+    <li>为什么选 K=5？K 增大后 Recall、噪声、Token 和延迟怎么变化？</li>
+    <li>为什么 Recall 100% 仍可能很差？能否同时给出 Top-1、FPR 和端到端结果？</li>
+    <li>Rerank 到底提高了什么？正确文档没进入候选集时，它能不能救回来？</li>
+    <li>开发集与锁定集如何隔离？有没有反复看 holdout 调参造成数据泄漏？</li>
+    <li>幻觉如何衡量？LLM-as-judge 是否与人工抽检校准？失败样本如何回流？</li>
+    <li>离线分数上线后如何监控：人工转接率、一次解决率、用户反馈、延迟和成本？</li>
+  </ol>
+
+  <section class="quiz"><strong>30秒自测</strong><p>如果 Recall@5 从100%保持100%，Top-1从90%升到100%，你能说“召回率提高了”吗？</p><p><b>答案：</b>不能。只能说排序质量改善；Recall 没变。还要检查负例FPR、端到端无依据回答率、延迟与成本。</p></section>
+
+  <p>一手资料：<a href="https://arxiv.org/abs/2104.08663">BEIR</a> · <a href="https://aclanthology.org/2024.eacl-demo.16/">RAGAS</a> · <a href="https://docs.langchain.com/langsmith/evaluate-rag-tutorial">LangSmith RAG evaluation</a></p>
+  <p><a href="../reference/rag-evaluation-interview-card.html">打开一页式面试速查卡</a> · 有不清楚的指标，继续问我并用项目中的一条失败样本练习。</p>
+</main></body></html>

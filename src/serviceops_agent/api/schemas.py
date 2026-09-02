@@ -5,7 +5,9 @@ Pydantic 模型是 API 边界的第一层保护：不合法数据在进入 LangG
 """
 
 # Literal 用于把健康状态和调试状态限制为固定字符串，防止接口输出任意值。
+from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 # BaseModel 提供解析和序列化；JsonValue 约束调试值只能是安全 JSON；
 # ConfigDict 禁止额外身份字段；StrictBool 防止字符串真值。
@@ -13,6 +15,13 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool
 
 # ApprovalAuditEvent 是只对 audit:read 主体公开的最小化审批证据记录。
 from serviceops_agent.domain.audit import ApprovalAuditEvent
+
+# 会话API直接复用领域有限状态，防止HTTP层重新定义含义不同的字符串。
+from serviceops_agent.domain.conversation import (
+    ConversationExecutionRecoveryResult,
+    ConversationStatus,
+    ConversationTurnStatus,
+)
 
 # Intent 是有限业务枚举，ChatResponse 会把它安全地序列化为 JSON 字符串。
 from serviceops_agent.domain.enums import Intent
@@ -292,3 +301,75 @@ class ChatResponse(BaseModel):
     return_request_id: str | None = None
     # events 是当前教学阶段公开的执行轨迹，展示各节点按什么顺序运行。
     events: list[str]
+
+
+class ConversationMessageRequest(BaseModel):
+    """在既有会话中提交一轮必须可安全重试的用户消息。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4000, description="本轮用户问题")
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+        description="客户端为本轮生成并在重试时保持不变的幂等键",
+    )
+
+
+class ConversationCreateResponse(BaseModel):
+    """创建会话后返回的低敏生命周期信息。"""
+
+    conversation_id: UUID
+    status: ConversationStatus
+    memory_version: int = Field(ge=0)
+    created_at: datetime
+    expires_at: datetime
+
+
+class ConversationTurnSummary(BaseModel):
+    """会话详情中可向所有者公开的一轮最小摘要。"""
+
+    turn_id: UUID
+    workflow_thread_id: UUID
+    sequence_number: int = Field(ge=1)
+    status: ConversationTurnStatus
+    user_message: str
+    standalone_question: str | None = None
+    assistant_answer: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationDetailResponse(ConversationCreateResponse):
+    """会话所有者读取的会话元数据与有限最近轮次。"""
+
+    updated_at: datetime
+    turns: list[ConversationTurnSummary] = Field(default_factory=list)
+
+
+class ConversationCleanupResponse(BaseModel):
+    """运维清理一批到期会话后的低敏聚合结果。"""
+
+    # scanned_count 只表示本批取得的删除计划数，不暴露会话或用户标识。
+    scanned_count: int = Field(ge=0)
+    # deleted_count 表示 Checkpoint 与业务映射均已完成物理删除的计划数。
+    deleted_count: int = Field(ge=0)
+    # failed_count 表示仍保留关闭映射、可以安全重试的计划数。
+    failed_count: int = Field(ge=0)
+
+
+class ConversationExecutionRecoveryResponse(ConversationExecutionRecoveryResult):
+    """陈旧工作流恢复的纯计数响应，不包含身份、正文、ID或租约凭证。"""
+
+    # from_attributes允许路由直接校验领域恢复结果，无需复制或扩展字段。
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+
+class ConversationMessageResponse(ChatResponse):
+    """单轮Agent响应及其在多轮会话中的稳定定位信息。"""
+
+    conversation_id: UUID
+    turn_id: UUID
+    sequence_number: int = Field(ge=1)
+    replayed: bool

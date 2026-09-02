@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 # Literal 把运行时后端名称限制为设置允许的三个值。
-from typing import Literal
+from typing import Literal, Protocol
 
 # InMemorySaver 用于自动测试；PostgreSQL Saver 用于可扩展的服务端持久化。
 from langgraph.checkpoint.memory import InMemorySaver
@@ -44,6 +44,14 @@ from serviceops_agent.infrastructure.audit_repository import (
 # 显式类型白名单避免 Checkpointer 从数据库恢复任意 Python 类型。
 from serviceops_agent.infrastructure.checkpoint_serde import create_checkpoint_serializer
 
+# 会话仓库与 Checkpointer 分工：前者保存跨轮业务索引，后者保存单轮图执行快照。
+from serviceops_agent.infrastructure.conversation_repository import (
+    ConversationRepository,
+    InMemoryConversationRepository,
+    PostgresConversationRepository,
+    SQLiteConversationRepository,
+)
+
 # 订单仓库是退货写入前归属和状态二次检查的数据源。
 from serviceops_agent.infrastructure.order_repository import (
     OrderRepository,
@@ -73,6 +81,13 @@ from serviceops_agent.rag.retriever import (
 )
 
 
+class CheckpointDeleter(Protocol):
+    """会话隐私清理只需要的最小 LangGraph Checkpoint 删除能力。"""
+
+    async def adelete_thread(self, thread_id: str) -> None:
+        """幂等删除一个稳定工作流线程的全部 Checkpoint。"""
+
+
 @dataclass(frozen=True)
 class AgentRuntime:
     """FastAPI lifespan 内共享的一组已完成装配的 Agent 资源。"""
@@ -85,6 +100,10 @@ class AgentRuntime:
     return_outbox_repository: ReturnOutboxRepository
     # approval_audit_repository 负责追加审批决定/结果并向审计接口提供只读链。
     approval_audit_repository: ApprovalAuditRepository
+    # conversation_repository 保存会话所有权、轮次幂等状态和有限结构化记忆。
+    conversation_repository: ConversationRepository
+    # checkpoint_deleter 显式暴露会话清理能力，API 不读取编译图的内部属性。
+    checkpoint_deleter: CheckpointDeleter
     # knowledge_retriever 同时服务 LangGraph FAQ 节点和 /ready 的 Qdrant 只读探测。
     knowledge_retriever: HealthCheckableKnowledgeRetriever
     # persistence_backend 便于健康接口和日志确认实际运行模式。
@@ -124,6 +143,8 @@ async def create_agent_runtime(
         memory_return_repository = InMemoryReturnRequestRepository(selected_order_repository)
         # 测试运行时使用隔离的进程内审计仓库，不创建本地数据库文件。
         memory_audit_repository = InMemoryApprovalAuditRepository()
+        # 会话状态使用同一运行时生命周期，但不与 LangGraph Checkpoint 混为一张记录。
+        memory_conversation_repository = InMemoryConversationRepository()
         # 当前进程创建独立 Checkpointer。
         memory_checkpointer = InMemorySaver(serde=create_checkpoint_serializer())
         # 图同时绑定这两个内存依赖。
@@ -140,6 +161,8 @@ async def create_agent_runtime(
             return_request_repository=memory_return_repository,
             return_outbox_repository=memory_return_repository,
             approval_audit_repository=memory_audit_repository,
+            conversation_repository=memory_conversation_repository,
+            checkpoint_deleter=memory_checkpointer,
             knowledge_retriever=knowledge_retriever,
             persistence_backend="memory",
         )
@@ -157,6 +180,10 @@ async def create_agent_runtime(
         )
         # 审计事件属于业务/安全记录，保存在同一业务数据库的独立只追加表中。
         sqlite_audit_repository = SQLiteApprovalAuditRepository(
+            database_path=business_database_path,
+        )
+        # 会话表属于业务索引，与退货/审计表共用业务数据库而不是 Checkpoint 数据库。
+        sqlite_conversation_repository = SQLiteConversationRepository(
             database_path=business_database_path,
         )
         # Checkpoint 数据库与业务数据库分开，强调两者生命周期和职责不同。
@@ -186,6 +213,8 @@ async def create_agent_runtime(
                 return_request_repository=sqlite_return_repository,
                 return_outbox_repository=sqlite_return_repository,
                 approval_audit_repository=sqlite_audit_repository,
+                conversation_repository=sqlite_conversation_repository,
+                checkpoint_deleter=sqlite_checkpointer,
                 knowledge_retriever=knowledge_retriever,
                 persistence_backend="sqlite",
             )
@@ -217,6 +246,10 @@ async def create_agent_runtime(
         postgres_audit_repository = PostgresApprovalAuditRepository(
             pool=postgres_pool,
         )
+        # 多实例会话仓库复用有限同步连接池，表结构由 Alembic 预先创建。
+        postgres_conversation_repository = PostgresConversationRepository(
+            pool=postgres_pool,
+        )
         # 官方异步 Saver 单独管理 LangGraph Checkpoint 连接和表结构。
         async with AsyncPostgresSaver.from_conn_string(
             postgres_dsn,
@@ -239,6 +272,8 @@ async def create_agent_runtime(
                 return_request_repository=postgres_return_repository,
                 return_outbox_repository=postgres_return_repository,
                 approval_audit_repository=postgres_audit_repository,
+                conversation_repository=postgres_conversation_repository,
+                checkpoint_deleter=postgres_checkpointer,
                 knowledge_retriever=knowledge_retriever,
                 persistence_backend="postgres",
             )

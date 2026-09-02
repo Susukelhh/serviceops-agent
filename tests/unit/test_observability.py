@@ -25,6 +25,7 @@ from serviceops_agent.config.settings import Settings
 # Formatter/current_trace_id 是不需要后台线程的纯可观测边界。
 from serviceops_agent.observability.telemetry import (
     TraceJsonFormatter,
+    _build_telemetry_resource,
     current_trace_id,
 )
 
@@ -110,3 +111,21 @@ def test_production_rejects_console_telemetry_exporter() -> None:
             telemetry_enabled=True,
             telemetry_exporter="console",
         )
+
+
+def test_telemetry_resource_uses_configured_stable_instance_id() -> None:
+    """实例标签必须来自部署配置，不能使用SDK每次启动生成的随机UUID。"""
+
+    resource = _build_telemetry_resource(
+        Settings(instance_id="agent-a", telemetry_enabled=False)
+    )
+
+    assert resource.attributes["service.instance.id"] == "agent-a"
+    assert resource.attributes["service.name"] == "serviceops-agent"
+
+
+def test_shadow_candidate_id_rejects_high_cardinality_or_promql_text() -> None:
+    """候选标签只能是部署级短标识，不能注入请求、路径或PromQL。"""
+
+    with pytest.raises(ValidationError):
+        Settings(conversation_shadow_candidate_id='candidate-a"} or vector(1)')

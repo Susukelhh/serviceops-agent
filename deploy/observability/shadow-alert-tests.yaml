@@ -1,0 +1,179 @@
+rule_files:
+  - /etc/prometheus/shadow-alert-rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: safety violation rolls back immediately
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+10x10
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="safety_violation"}'
+        values: 0 0 0 0 0 1 1 1 1 1 1
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: ServiceOpsShadowSafetyViolation
+        exp_alerts:
+          - exp_labels:
+              candidate_id: candidate-a
+              severity: critical
+              release_action: rollback
+            exp_annotations:
+              summary: Conversation shadow safety invariant violated
+              runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+  - name: model failure above five percent rolls back after hold
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="model_failure"}'
+        values: 0+2x20
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ServiceOpsShadowModelFailureRateHigh
+        exp_alerts:
+          - exp_labels:
+              candidate_id: candidate-a
+              severity: critical
+              release_action: rollback
+            exp_annotations:
+              summary: Conversation shadow model failure rate is above 5 percent
+              runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+  - name: evidence abstention above thirty percent investigates after hold
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="evidence_abstention"}'
+        values: 0+8x20
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ServiceOpsShadowEvidenceAbstentionRateHigh
+        exp_alerts:
+          - exp_labels:
+              candidate_id: candidate-a
+              severity: warning
+              release_action: investigate
+            exp_annotations:
+              summary: Conversation shadow evidence abstention rate is above 30 percent
+              runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+  - name: ambiguity above thirty five percent investigates after hold
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="ambiguous_context"}'
+        values: 0+8x20
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ServiceOpsShadowAmbiguousContextRateHigh
+        exp_alerts:
+          - exp_labels:
+              candidate_id: candidate-a
+              severity: warning
+              release_action: investigate
+            exp_annotations:
+              summary: Conversation shadow ambiguity rate is above 35 percent
+              runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+  - name: handoff above forty percent investigates after hold
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="human_handoff"}'
+        values: 0+10x20
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ServiceOpsShadowHumanHandoffRateHigh
+        exp_alerts:
+          - exp_labels:
+              candidate_id: candidate-a
+              severity: warning
+              release_action: investigate
+            exp_annotations:
+              summary: Conversation shadow human handoff rate is above 40 percent
+              runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+  - name: exact thresholds remain healthy because policy uses strict greater than
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="model_failure"}'
+        values: 0+1x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="evidence_abstention"}'
+        values: 0+6x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="ambiguous_context"}'
+        values: 0+7x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="human_handoff"}'
+        values: 0+8x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="safety_violation"}'
+        values: 0+0x20
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: ServiceOpsShadowSafetyViolation
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: ServiceOpsShadowModelFailureRateHigh
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: ServiceOpsShadowEvidenceAbstentionRateHigh
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: ServiceOpsShadowAmbiguousContextRateHigh
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: ServiceOpsShadowHumanHandoffRateHigh
+        exp_alerts: []
+
+  - name: safety alert resolves after violation leaves five minute window
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+10x15
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="safety_violation"}'
+        values: 0 1+0x14
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ServiceOpsShadowSafetyViolation
+        exp_alerts: []
+
+  - name: model failure alert resolves after failures leave thirty minute window
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x60
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="model_failure"}'
+        values: 0+2x10 20+0x50
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: ServiceOpsShadowModelFailureRateHigh
+        exp_alerts: []
+
+  - name: failing candidate does not contaminate healthy candidate window
+    interval: 1m
+    input_series:
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="candidate-a"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="candidate-a",signal="model_failure"}'
+        values: 0+2x20
+      - series: 'serviceops_conversation_shadow_observations_total{candidate_id="stable-b"}'
+        values: 0+20x20
+      - series: 'serviceops_conversation_shadow_signals_total{candidate_id="stable-b",signal="model_failure"}'
+        values: 0+0x20
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: ServiceOpsShadowModelFailureRateHigh
+        exp_alerts:
+          - exp_labels:
+              candidate_id: candidate-a
+              severity: critical
+              release_action: rollback
+            exp_annotations:
+              summary: Conversation shadow model failure rate is above 5 percent
+              runbook: docs/runbooks/conversation-shadow-alert-response.md

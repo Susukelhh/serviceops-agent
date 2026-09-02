@@ -1,0 +1,61 @@
+{
+  "run_id": "local-20260830-step56-shadow-window",
+  "created_at": "2026-08-30T04:39:08Z",
+  "scope": "local_controlled_shadow_monitoring",
+  "environment": "development",
+  "model_backend": "mock",
+  "embedding_backend": "hash",
+  "generation_backend": "extractive",
+  "paid_qwen_calls": 0,
+  "shadow_sample_rate": 1.0,
+  "window": "30m",
+  "post_reset_successful_turns": 201,
+  "prometheus_window_is_extrapolated": true,
+  "stable_service_instance_ids": [
+    "agent-a",
+    "agent-b"
+  ],
+  "snapshot": {
+    "total_observations": 135,
+    "model_failures": 0,
+    "evidence_abstentions": 0,
+    "ambiguous_contexts": 0,
+    "human_handoffs": 27,
+    "safety_violations": 0,
+    "model_failure_rate": 0.0,
+    "evidence_abstention_rate": 0.0,
+    "ambiguous_context_rate": 0.0,
+    "human_handoff_rate": 0.2,
+    "safety_violation_rate": 0.0,
+    "safety_violation_code_counts": {}
+  },
+  "decision": {
+    "action": "continue",
+    "sufficient_sample": true,
+    "reason_codes": []
+  },
+  "prometheus_alerts": {
+    "firing": 0,
+    "pending": 0
+  },
+  "runtime_health": {
+    "api": "ready",
+    "prometheus_target": "up",
+    "grafana_database": "ok",
+    "alertmanager_http_status": 200,
+    "prometheus_rule_groups": 1,
+    "prometheus_rules": 15
+  },
+  "sha256": {
+    "runtime_snapshot": "919180baa43789fce1261aa87ff984bf28dfab38927751858ce131f40603e143",
+    "runtime_decision": "679babda149c09c9a1940353da93c1e35eaca7570ccdf82b82a7f50c4ab7b33e",
+    "prometheus_rules": "8432a18e6139e5dbae73d75b1ec77822d5aac843a6d61276676a9aa79869b42e",
+    "shadow_policy": "70ba61d8d05ab4c8510eb2e217adb0fa07168c0fe0ea0a1a6615800945d575ea"
+  },
+  "limitations": [
+    "local_controlled_traffic_not_production_traffic",
+    "mock_model_not_qwen",
+    "prometheus_increase_uses_scrape_boundary_extrapolation",
+    "continue_validates_monitoring_and_safety_signals_not_model_accuracy"
+  ]
+}

@@ -199,7 +199,7 @@
     {
       "case_id": "return-cross-user-order-hidden",
       "user_id": "user-001",
-      "message": "为订单 SO200001 申请退货，原因：商品不是我想要的款式",
+      "message": "为订单款 SO200001 申请退货，原因：商品不是我想要的式",
       "expected_intent": "return_request",
       "expected_requires_human": false,
       "expected_needs_clarification": true,

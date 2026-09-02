@@ -1,0 +1,67 @@
+{
+  "drill_id": "local-20260830-step57-shadow-alerts",
+  "created_at": "2026-08-30T05:12:43Z",
+  "scope": "local_offline_alert_and_release_action_drill",
+  "paid_qwen_calls": 0,
+  "promtool": {
+    "version": "3.5.0",
+    "rule_count": 15,
+    "test_scenarios": 8,
+    "passed_scenarios": 8,
+    "result": "PASS"
+  },
+  "application_release_decisions": {
+    "test_scenarios": 7,
+    "passed_scenarios": 7,
+    "result": "PASS",
+    "actions_verified": [
+      "observe",
+      "continue",
+      "investigate",
+      "rollback"
+    ]
+  },
+  "prometheus_alerts_verified": [
+    {
+      "alert": "ServiceOpsShadowSafetyViolation",
+      "release_action": "rollback",
+      "recovery_verified": true
+    },
+    {
+      "alert": "ServiceOpsShadowModelFailureRateHigh",
+      "release_action": "rollback",
+      "recovery_verified": true
+    },
+    {
+      "alert": "ServiceOpsShadowEvidenceAbstentionRateHigh",
+      "release_action": "investigate",
+      "recovery_verified": false
+    },
+    {
+      "alert": "ServiceOpsShadowAmbiguousContextRateHigh",
+      "release_action": "investigate",
+      "recovery_verified": false
+    },
+    {
+      "alert": "ServiceOpsShadowHumanHandoffRateHigh",
+      "release_action": "investigate",
+      "recovery_verified": false
+    }
+  ],
+  "boundary_verified": "rates_equal_to_threshold_do_not_alert",
+  "runtime_mutation": "promtool_isolated_rule_evaluation_only",
+  "external_deployment_rollback_executed": false,
+  "sha256": {
+    "prometheus_rules": "6c6a79bdac988826ed37a4bd7666b99b0eec046b955d2a9ccf04c0603f3759f8",
+    "promtool_tests": "c14529e4d223ebef724f70908866fae316d814abe3c0fe24a13f749e61056872",
+    "shadow_policy": "70ba61d8d05ab4c8510eb2e217adb0fa07168c0fe0ea0a1a6615800945d575ea",
+    "application_drill_report": "793ae377cd07b5340c585c02ec739311d817e7d8dbec2883903b14e7a20bc6ff",
+    "runbook": "a0ec535fe57e4bfe9be8fa1e1679ec2aaa5073e24d89752d2025c5a89933ce92"
+  },
+  "limitations": [
+    "promtool_does_not_modify_live_agent_metrics",
+    "no_external_cd_platform_is_connected",
+    "alert_recovery_does_not_prove_root_cause_resolution",
+    "drill_validates_rules_and_actions_not_model_accuracy"
+  ]
+}

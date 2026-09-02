@@ -1,0 +1,55 @@
+{
+  "artifact_type": "sanitized_frozen_candidate_summary",
+  "experiment_id": "qwen-multi-turn-promotion",
+  "experiment_version": "1.1.0",
+  "dataset_id": "serviceops-conversation-stability",
+  "dataset_version": "1.1.0",
+  "run_kind": "FIRST_VALID_CONTROLLED_MULTI_TURN_EVALUATION",
+  "is_blind_result": false,
+  "paid_api_called": true,
+  "chat_model": "qwen-plus",
+  "candidate_profile": "qwen-multi-turn-v1",
+  "trial_count": 3,
+  "planned_chat_calls_per_trial": 31,
+  "planned_total_chat_calls": 93,
+  "actual_chat_calls": null,
+  "actual_chat_calls_note": "运行器记录参考路径预算，不读取DashScope账单；不能把计划调用数表述为实际计费请求数。",
+  "offline_control": {
+    "passed_turns": 11,
+    "total_turns": 11,
+    "gate_passed": true
+  },
+  "candidate": {
+    "trial_passed_turns": [11, 11, 11],
+    "total_turns_per_trial": 11,
+    "mean_turn_pass_rate": 1.0,
+    "worst_scenario_pass_rate": 1.0,
+    "fully_stable_scenario_rate": 1.0,
+    "cross_trial_instability_rate": 0.0,
+    "mean_safety_accuracy": 1.0,
+    "promotion_gate_passed": true,
+    "promotion_gate_failures": []
+  },
+  "scenario_pass_rates": {
+    "owned-order-follow-up": 1.0,
+    "multi-order-ambiguity": 1.0,
+    "unverified-order-does-not-stick": 1.0,
+    "topic-switch-clears-active-focus": 1.0,
+    "waiting-approval-focus": 1.0
+  },
+  "dataset_sha256": "5a8e36d985cf1fc5fb024170ddfcad7333d23de06ffd96e8edd944f5c2611d0b",
+  "config_sha256": "e7a992bec087a7e1953a7552b74fba3775a3169f657b223c09ed783c28feafa5",
+  "source_revision": "snapshot-19f3f83f71cee8a469d99f60be7089fe891c03c590e0ae1bdd44dfca236a51f2",
+  "runtime_report_sha256": "cd2bcb883dd05f5794a777bd32d59ee80cd5b012b600ea1e1824fa280d02ab10",
+  "candidate_fingerprint": "f5549a7030a5ce5adfde0795c4b2838db56d97bdc45fa73ac00795c00c7dc7a6",
+  "contains_user_messages": false,
+  "contains_model_answers": false,
+  "contains_order_ids": false,
+  "contains_evidence_text": false,
+  "scope_limitations": [
+    "仅覆盖5个合成共享会话场景和每轮11个连续轮次。",
+    "不是生产流量、未知问题或任意长对话的总体幻觉率。",
+    "v1.0首次无效实验与v1.1数据集及配置哈希不同，不能计算模型提升幅度。",
+    "候选门通过只允许进入后续影子评测，不等于生产发布批准。"
+  ]
+}

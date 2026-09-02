@@ -1,0 +1,10 @@
+# 本地默认只在Alertmanager UI保留告警，不向邮件、聊天或Webhook发送数据。
+route:
+  receiver: local-ui-only
+  group_by: [alertname, severity, candidate_id]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: local-ui-only

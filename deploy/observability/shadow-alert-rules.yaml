@@ -1,0 +1,74 @@
+groups:
+  - name: serviceops-conversation-shadow
+    interval: 30s
+    rules:
+      - record: serviceops:conversation_shadow:observations_30m
+        expr: sum by (candidate_id) (increase(serviceops_conversation_shadow_observations_total[30m]))
+      - record: serviceops:conversation_shadow:model_failures_30m
+        expr: sum by (candidate_id) (increase(serviceops_conversation_shadow_signals_total{signal="model_failure"}[30m]))
+      - record: serviceops:conversation_shadow:evidence_abstentions_30m
+        expr: sum by (candidate_id) (increase(serviceops_conversation_shadow_signals_total{signal="evidence_abstention"}[30m]))
+      - record: serviceops:conversation_shadow:ambiguous_contexts_30m
+        expr: sum by (candidate_id) (increase(serviceops_conversation_shadow_signals_total{signal="ambiguous_context"}[30m]))
+      - record: serviceops:conversation_shadow:human_handoffs_30m
+        expr: sum by (candidate_id) (increase(serviceops_conversation_shadow_signals_total{signal="human_handoff"}[30m]))
+      - record: serviceops:conversation_shadow:safety_violations_5m
+        expr: sum by (candidate_id) (increase(serviceops_conversation_shadow_signals_total{signal="safety_violation"}[5m]))
+      - record: serviceops:conversation_shadow:model_failure_rate_30m
+        expr: serviceops:conversation_shadow:model_failures_30m / clamp_min(serviceops:conversation_shadow:observations_30m, 1)
+      - record: serviceops:conversation_shadow:evidence_abstention_rate_30m
+        expr: serviceops:conversation_shadow:evidence_abstentions_30m / clamp_min(serviceops:conversation_shadow:observations_30m, 1)
+      - record: serviceops:conversation_shadow:ambiguous_context_rate_30m
+        expr: serviceops:conversation_shadow:ambiguous_contexts_30m / clamp_min(serviceops:conversation_shadow:observations_30m, 1)
+      - record: serviceops:conversation_shadow:human_handoff_rate_30m
+        expr: serviceops:conversation_shadow:human_handoffs_30m / clamp_min(serviceops:conversation_shadow:observations_30m, 1)
+
+      - alert: ServiceOpsShadowSafetyViolation
+        expr: serviceops:conversation_shadow:safety_violations_5m > 0
+        for: 0m
+        labels:
+          severity: critical
+          release_action: rollback
+        annotations:
+          summary: Conversation shadow safety invariant violated
+          runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+      - alert: ServiceOpsShadowModelFailureRateHigh
+        expr: serviceops:conversation_shadow:observations_30m >= 100 and serviceops:conversation_shadow:model_failure_rate_30m > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          release_action: rollback
+        annotations:
+          summary: Conversation shadow model failure rate is above 5 percent
+          runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+      - alert: ServiceOpsShadowEvidenceAbstentionRateHigh
+        expr: serviceops:conversation_shadow:observations_30m >= 100 and serviceops:conversation_shadow:evidence_abstention_rate_30m > 0.30
+        for: 10m
+        labels:
+          severity: warning
+          release_action: investigate
+        annotations:
+          summary: Conversation shadow evidence abstention rate is above 30 percent
+          runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+      - alert: ServiceOpsShadowAmbiguousContextRateHigh
+        expr: serviceops:conversation_shadow:observations_30m >= 100 and serviceops:conversation_shadow:ambiguous_context_rate_30m > 0.35
+        for: 10m
+        labels:
+          severity: warning
+          release_action: investigate
+        annotations:
+          summary: Conversation shadow ambiguity rate is above 35 percent
+          runbook: docs/runbooks/conversation-shadow-alert-response.md
+
+      - alert: ServiceOpsShadowHumanHandoffRateHigh
+        expr: serviceops:conversation_shadow:observations_30m >= 100 and serviceops:conversation_shadow:human_handoff_rate_30m > 0.40
+        for: 10m
+        labels:
+          severity: warning
+          release_action: investigate
+        annotations:
+          summary: Conversation shadow human handoff rate is above 40 percent
+          runbook: docs/runbooks/conversation-shadow-alert-response.md

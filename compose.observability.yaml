@@ -1,0 +1,118 @@
+# 与compose.yaml叠加使用；为本地影子评测开启低敏OTel指标、Prometheus和Grafana。
+services:
+  agent-a:
+    environment:
+      SERVICEOPS_TELEMETRY_ENABLED: "true"
+      SERVICEOPS_TELEMETRY_EXPORTER: otlp_http
+      SERVICEOPS_OTEL_OTLP_ENDPOINT: http://otel-collector:4318
+      SERVICEOPS_CONVERSATION_SHADOW_ENABLED: "true"
+      SERVICEOPS_CONVERSATION_SHADOW_SAMPLE_RATE: ${SERVICEOPS_CONVERSATION_SHADOW_SAMPLE_RATE:-0.10}
+      SERVICEOPS_CONVERSATION_SHADOW_CANDIDATE_ID: ${SERVICEOPS_CONVERSATION_SHADOW_CANDIDATE_ID:-local-shadow-v1}
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+
+  agent-b:
+    environment:
+      SERVICEOPS_TELEMETRY_ENABLED: "true"
+      SERVICEOPS_TELEMETRY_EXPORTER: otlp_http
+      SERVICEOPS_OTEL_OTLP_ENDPOINT: http://otel-collector:4318
+      SERVICEOPS_CONVERSATION_SHADOW_ENABLED: "true"
+      SERVICEOPS_CONVERSATION_SHADOW_SAMPLE_RATE: ${SERVICEOPS_CONVERSATION_SHADOW_SAMPLE_RATE:-0.10}
+      SERVICEOPS_CONVERSATION_SHADOW_CANDIDATE_ID: ${SERVICEOPS_CONVERSATION_SHADOW_CANDIDATE_ID:-local-shadow-v1}
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+
+  otel-collector:
+    image: ${SERVICEOPS_OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.135.0}
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./deploy/observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    expose:
+      - "4318"
+      - "9464"
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "validate", "--config=/etc/otelcol-contrib/config.yaml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 0.5
+
+  prometheus:
+    image: ${SERVICEOPS_PROMETHEUS_IMAGE:-prom/prometheus:v3.5.0}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    volumes:
+      - ./deploy/observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/shadow-alert-rules.yaml:/etc/prometheus/shadow-alert-rules.yaml:ro
+      - ./deploy/observability/shadow-alert-tests.yaml:/etc/prometheus/shadow-alert-tests.yaml:ro
+      - serviceops-prometheus:/prometheus
+    ports:
+      - "${SERVICEOPS_PROMETHEUS_BIND_ADDRESS:-127.0.0.1}:9090:9090"
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+      alertmanager:
+        condition: service_started
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: 0.75
+
+  alertmanager:
+    image: ${SERVICEOPS_ALERTMANAGER_IMAGE:-prom/alertmanager:v0.28.1}
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./deploy/observability/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - serviceops-alertmanager:/alertmanager
+    ports:
+      - "${SERVICEOPS_ALERTMANAGER_BIND_ADDRESS:-127.0.0.1}:9093:9093"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.25
+
+  grafana:
+    image: ${SERVICEOPS_GRAFANA_IMAGE:-grafana/grafana:12.1.1}
+    environment:
+      GF_SECURITY_ADMIN_USER: ${SERVICEOPS_GRAFANA_ADMIN_USER:-admin}
+      # Compose在变量缺失时直接失败，避免共享环境意外沿用仓库内公开口令。
+      GF_SECURITY_ADMIN_PASSWORD: ${SERVICEOPS_GRAFANA_ADMIN_PASSWORD:?set SERVICEOPS_GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - serviceops-grafana:/var/lib/grafana
+    ports:
+      - "${SERVICEOPS_GRAFANA_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 0.5
+
+volumes:
+  serviceops-prometheus:
+  serviceops-alertmanager:
+  serviceops-grafana:

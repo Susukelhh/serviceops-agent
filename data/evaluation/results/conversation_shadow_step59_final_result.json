@@ -1,0 +1,64 @@
+{
+  "drill_id": "local-20260830-step59-final-candidate-isolation",
+  "created_at": "2026-08-30T13:52:59+08:00",
+  "scope": "local_offline_final_candidate_isolation_and_release_gate",
+  "paid_qwen_calls": 0,
+  "promtool": {
+    "version": "3.5.0",
+    "rule_count": 15,
+    "test_scenarios": 9,
+    "passed_scenarios": 9,
+    "result": "PASS"
+  },
+  "application_release_decisions": {
+    "test_scenarios": 7,
+    "passed_scenarios": 7,
+    "result": "PASS",
+    "actions_verified": [
+      "observe",
+      "continue",
+      "investigate",
+      "rollback"
+    ]
+  },
+  "candidate_identity_isolated": true,
+  "candidate_identity_contract": {
+    "example_candidate_id": "local-shadow-v1",
+    "allowed_pattern": "^[a-z0-9][a-z0-9.-]{0,63}$",
+    "isolated_surfaces": [
+      "raw_metrics",
+      "recording_rules",
+      "alerts",
+      "alertmanager_grouping",
+      "grafana_dashboard",
+      "prometheus_export_cli",
+      "release_snapshot"
+    ],
+    "cross_candidate_fault_scenario": "PASS",
+    "runtime_metric_series_observed": true
+  },
+  "runtime_verification": {
+    "candidate_id": "local-shadow-v1",
+    "service_instance_id": "agent-b",
+    "observation_value": 1,
+    "prometheus_rule_count": 15,
+    "firing_alert_count": 0,
+    "grafana_database": "ok",
+    "alertmanager_http_status": 200
+  },
+  "external_deployment_rollback_executed": false,
+  "sha256": {
+    "prometheus_rules": "dea1155db9c0ba1bbb4dc43459c905cb6cdb3067bd635d04333c0d2fb6aa5806",
+    "promtool_tests": "393fb90e218d14d1cc55059714ce4c8b1d52b071037bcdf1f12b48141c142b50",
+    "shadow_policy": "70ba61d8d05ab4c8510eb2e217adb0fa07168c0fe0ea0a1a6615800945d575ea",
+    "application_drill_report": "baa5ea4e575c8881f111e46171531ee628a5fb545bf6a1f49d421b5fc28db1aa",
+    "runbook": "1e81e8bcf94243139125e15c04c4aa204f9ddf290d804820c17ebb4115cacc52"
+  },
+  "limitations": [
+    "runtime_request_used_mock_hash_extractive_backends",
+    "post_restart_prometheus_window_was_below_minimum_sample",
+    "no_external_cd_platform_is_connected",
+    "no_external_deployment_rollback_was_executed",
+    "candidate_isolation_does_not_prove_model_accuracy"
+  ]
+}

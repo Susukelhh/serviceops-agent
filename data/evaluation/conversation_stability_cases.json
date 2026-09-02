@@ -1,0 +1,288 @@
+{
+  "dataset_id": "serviceops-conversation-stability",
+  "version": "1.1.0",
+  "description": "完全离线验证多轮订单指代、歧义澄清、主题切换、审批焦点、长期摘要、执行租约和幂等重放。v1.1使模拟图意图与真实业务路由一致：订单追问缺少唯一目标时仍属于order_status澄清，而不是human_handoff。",
+  "thresholds": {
+    "min_overall_pass_rate": 1.0,
+    "min_resolution_accuracy": 1.0,
+    "min_memory_accuracy": 1.0,
+    "min_execution_safety_accuracy": 1.0,
+    "min_isolation_accuracy": 1.0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "owned-order-follow-up",
+      "owner_user_id": "user-001",
+      "turns": [
+        {
+          "message": "查询订单 SO100001",
+          "idempotency_key": "stable-owned-0001",
+          "expected_reason": "explicit_reference",
+          "expected_standalone_question": "查询订单 SO100001",
+          "expected_referenced_order_ids": ["SO100001"],
+          "simulated_intent": "order_status",
+          "simulated_verified_order_ids": ["SO100001"],
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": "SO100001",
+            "recent_order_ids": ["SO100001"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 1
+          }
+        },
+        {
+          "message": "它现在到哪了？",
+          "idempotency_key": "stable-owned-0002",
+          "expected_reason": "verified_order_reference",
+          "expected_standalone_question": "关于订单 SO100001，它现在到哪了？",
+          "expected_referenced_order_ids": ["SO100001"],
+          "simulated_intent": "order_status",
+          "simulated_verified_order_ids": ["SO100001"],
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": "SO100001",
+            "recent_order_ids": ["SO100001"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "multi-order-ambiguity",
+      "owner_user_id": "user-001",
+      "turns": [
+        {
+          "message": "查询订单 SO100001 和 SO100002",
+          "idempotency_key": "stable-multi-0001",
+          "expected_reason": "explicit_reference",
+          "expected_standalone_question": "查询订单 SO100001 和 SO100002",
+          "expected_referenced_order_ids": ["SO100001", "SO100002"],
+          "simulated_intent": "order_status",
+          "simulated_verified_order_ids": ["SO100001", "SO100002"],
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": null,
+            "recent_order_ids": ["SO100001", "SO100002"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 1
+          }
+        },
+        {
+          "message": "这个订单什么时候到？",
+          "idempotency_key": "stable-multi-0002",
+          "expected_reason": "ambiguous_order_reference",
+          "expected_standalone_question": "订单追问存在多个候选，请先要求用户明确订单号：这个订单什么时候到？",
+          "expected_needs_clarification": true,
+          "expected_referenced_order_ids": [],
+          "simulated_intent": "order_status",
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": null,
+            "recent_order_ids": ["SO100001", "SO100002"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "unverified-order-does-not-stick",
+      "owner_user_id": "user-001",
+      "turns": [
+        {
+          "message": "查询订单 SO200001",
+          "idempotency_key": "stable-unverified-0001",
+          "expected_reason": "explicit_reference",
+          "expected_standalone_question": "查询订单 SO200001",
+          "expected_referenced_order_ids": ["SO200001"],
+          "simulated_intent": "order_status",
+          "simulated_verified_order_ids": [],
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": null,
+            "recent_order_ids": [],
+            "recent_document_ids": [],
+            "last_processed_sequence": 1
+          }
+        },
+        {
+          "message": "它现在到哪了？",
+          "idempotency_key": "stable-unverified-0002",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "它现在到哪了？",
+          "expected_referenced_order_ids": [],
+          "simulated_intent": "order_status",
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": null,
+            "recent_order_ids": [],
+            "recent_document_ids": [],
+            "last_processed_sequence": 2
+          },
+          "forbidden_memory_order_ids": ["SO200001"]
+        }
+      ]
+    },
+    {
+      "scenario_id": "topic-switch-clears-active-focus",
+      "owner_user_id": "user-001",
+      "turns": [
+        {
+          "message": "查询订单 SO100001",
+          "idempotency_key": "stable-switch-0001",
+          "expected_reason": "explicit_reference",
+          "expected_standalone_question": "查询订单 SO100001",
+          "expected_referenced_order_ids": ["SO100001"],
+          "simulated_intent": "order_status",
+          "simulated_verified_order_ids": ["SO100001"],
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": "SO100001",
+            "recent_order_ids": ["SO100001"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 1
+          }
+        },
+        {
+          "message": "发票税号写错了怎么办",
+          "idempotency_key": "stable-switch-0002",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票税号写错了怎么办",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-INVOICE-001"],
+          "expected_memory": {
+            "current_topic": "faq",
+            "active_order_id": null,
+            "recent_order_ids": ["SO100001"],
+            "recent_document_ids": ["KB-INVOICE-001"],
+            "last_processed_sequence": 2
+          }
+        },
+        {
+          "message": "它现在到哪了？",
+          "idempotency_key": "stable-switch-0003",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "它现在到哪了？",
+          "simulated_intent": "order_status",
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": null,
+            "recent_order_ids": ["SO100001"],
+            "recent_document_ids": ["KB-INVOICE-001"],
+            "last_processed_sequence": 3
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "waiting-approval-focus",
+      "owner_user_id": "user-001",
+      "turns": [
+        {
+          "message": "为订单 SO100002 申请退货，原因：商品尺寸不合适",
+          "idempotency_key": "stable-approval-0001",
+          "expected_reason": "explicit_reference",
+          "expected_standalone_question": "为订单 SO100002 申请退货，原因：商品尺寸不合适",
+          "expected_referenced_order_ids": ["SO100002"],
+          "simulated_status": "waiting_approval",
+          "simulated_intent": "return_request",
+          "simulated_verified_order_ids": ["SO100002"],
+          "expected_memory": {
+            "current_topic": "return_request",
+            "active_order_id": "SO100002",
+            "recent_order_ids": ["SO100002"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 1
+          }
+        },
+        {
+          "message": "这个订单现在到哪了？",
+          "idempotency_key": "stable-approval-0002",
+          "expected_reason": "verified_order_reference",
+          "expected_standalone_question": "关于订单 SO100002，这个订单现在到哪了？",
+          "expected_referenced_order_ids": ["SO100002"],
+          "simulated_intent": "order_status",
+          "simulated_verified_order_ids": ["SO100002"],
+          "expected_memory": {
+            "current_topic": "order_status",
+            "active_order_id": "SO100002",
+            "recent_order_ids": ["SO100002"],
+            "recent_document_ids": [],
+            "last_processed_sequence": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "long-window-safe-summary",
+      "owner_user_id": "user-001",
+      "turns": [
+        {
+          "message": "发票问题 secret-marker-001",
+          "idempotency_key": "stable-long-0001",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题 secret-marker-001",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-001"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001"], "last_processed_sequence": 1}
+        },
+        {
+          "message": "发票问题二",
+          "idempotency_key": "stable-long-0002",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题二",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-002"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001", "KB-LONG-002"], "last_processed_sequence": 2}
+        },
+        {
+          "message": "发票问题三",
+          "idempotency_key": "stable-long-0003",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题三",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-003"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001", "KB-LONG-002", "KB-LONG-003"], "last_processed_sequence": 3}
+        },
+        {
+          "message": "发票问题四",
+          "idempotency_key": "stable-long-0004",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题四",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-004"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001", "KB-LONG-002", "KB-LONG-003", "KB-LONG-004"], "last_processed_sequence": 4}
+        },
+        {
+          "message": "发票问题五",
+          "idempotency_key": "stable-long-0005",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题五",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-005"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001", "KB-LONG-002", "KB-LONG-003", "KB-LONG-004", "KB-LONG-005"], "last_processed_sequence": 5}
+        },
+        {
+          "message": "发票问题六",
+          "idempotency_key": "stable-long-0006",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题六",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-006"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001", "KB-LONG-002", "KB-LONG-003", "KB-LONG-004", "KB-LONG-005", "KB-LONG-006"], "last_processed_sequence": 6}
+        },
+        {
+          "message": "发票问题七",
+          "idempotency_key": "stable-long-0007",
+          "expected_reason": "independent_question",
+          "expected_standalone_question": "发票问题七",
+          "simulated_intent": "faq",
+          "simulated_cited_document_ids": ["KB-LONG-007"],
+          "expected_memory": {"current_topic": "faq", "active_order_id": null, "recent_order_ids": [], "recent_document_ids": ["KB-LONG-001", "KB-LONG-002", "KB-LONG-003", "KB-LONG-004", "KB-LONG-005", "KB-LONG-006", "KB-LONG-007"], "last_processed_sequence": 7, "bounded_summary_required": true},
+          "forbidden_summary_terms": ["secret-marker-001", "KB-LONG-001", "OFFLINE_ASSISTANT_SENTINEL"]
+        }
+      ]
+    }
+  ]
+}

@@ -87,6 +87,23 @@ jobs:
           --trials "${{ inputs.trials }}"
           --report data/runtime/qwen_candidate_experiment_report.json
 
+      # 共享会话候选复用同一次人工授权；脚本在创建客户端前执行版本化调用预算硬校验。
+      - name: Run repeated Qwen multi-turn candidate experiment
+        run: >-
+          uv run --frozen python examples/49_qwen_multi_turn_experiment.py
+          --confirm-paid-api
+          --trials "${{ inputs.trials }}"
+          --report data/runtime/qwen_multi_turn_experiment_report.json
+
+      # 即使晋级失败也归档诊断；报告会重新聚合，不能靠手改总分伪造通过。
+      - name: Validate and archive Qwen multi-turn evidence
+        if: ${{ always() && hashFiles('data/runtime/qwen_multi_turn_experiment_report.json') != '' }}
+        run: >-
+          uv run --frozen python examples/50_archive_qwen_multi_turn_evidence.py
+          --report data/runtime/qwen_multi_turn_experiment_report.json
+          --run-id "github-${{ github.run_id }}-${{ github.run_attempt }}"
+          --source-revision "${{ github.sha }}"
+
       # 晋级失败仍上传完整逐轮报告，方便分析哪条 case、哪一层出现波动。
       - name: Upload Qwen candidate report
         if: ${{ always() && hashFiles('data/runtime/qwen_candidate_experiment_report.json') != '' }}
@@ -96,3 +113,21 @@ jobs:
           path: data/runtime/qwen_candidate_experiment_report.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Qwen multi-turn candidate report
+        if: ${{ always() && hashFiles('data/runtime/qwen_multi_turn_experiment_report.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qwen-multi-turn-evaluation-${{ github.run_id }}
+          path: data/runtime/qwen_multi_turn_experiment_report.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload immutable Qwen multi-turn evidence bundle
+        if: ${{ always() && hashFiles('data/runtime/qwen_multi_turn_evidence/*.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qwen-multi-turn-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data/runtime/qwen_multi_turn_evidence/*.json
+          if-no-files-found: error
+          retention-days: 30

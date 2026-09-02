@@ -11,6 +11,17 @@ from serviceops_agent.evaluation.agent_evaluator import (
     evaluate_agent_dataset,
     load_agent_evaluation_dataset,
 )
+from serviceops_agent.evaluation.conversation_stability_evaluator import (
+    ConversationMemoryExpectation,
+    ConversationStabilityDataset,
+    ConversationStabilityScenario,
+    ConversationStabilitySummary,
+    ConversationStabilityThresholds,
+    ConversationStabilityTurn,
+    ConversationStabilityTurnResult,
+    evaluate_conversation_stability,
+    load_conversation_stability_dataset,
+)
 from serviceops_agent.evaluation.experiment import (
     QWEN_CANDIDATE_PROFILE,
     AgentCandidateExperimentConfig,
@@ -92,6 +103,44 @@ from serviceops_agent.evaluation.public_demo_blind_evaluator import (
     PublicDemoBlindThresholds,
     evaluate_public_demo_blind_suite,
     load_public_demo_blind_config,
+)
+from serviceops_agent.evaluation.qwen_candidate_comparison import (
+    CandidateFailureCategory,
+    QwenCandidateComparisonPolicy,
+    QwenCandidateComparisonReport,
+    QwenRegressionQueueItem,
+    QwenScenarioComparison,
+    classify_candidate_failure,
+    compare_qwen_candidate_evidence,
+    load_qwen_candidate_comparison_policy,
+    load_qwen_multi_turn_evidence_bundle,
+    render_qwen_candidate_comparison_html,
+    write_qwen_candidate_comparison_artifacts,
+)
+from serviceops_agent.evaluation.qwen_multi_turn_evidence import (
+    QwenMultiTurnEvidenceBundle,
+    QwenMultiTurnEvidenceManifest,
+    QwenMultiTurnFailureDiagnosis,
+    archive_qwen_multi_turn_evidence,
+    build_and_archive_qwen_multi_turn_evidence,
+    build_qwen_multi_turn_evidence_bundle,
+    diagnose_qwen_multi_turn_failures,
+)
+from serviceops_agent.evaluation.qwen_multi_turn_experiment import (
+    QwenMultiTurnExperimentConfig,
+    QwenMultiTurnExperimentReport,
+    QwenMultiTurnResult,
+    QwenMultiTurnThresholds,
+    QwenMultiTurnTrialSummary,
+    QwenScenarioStability,
+    enforce_qwen_multi_turn_budget,
+    estimate_qwen_multi_turn_chat_calls,
+    evaluate_qwen_multi_turn_trial,
+    load_qwen_multi_turn_config,
+    override_qwen_multi_turn_trials,
+    run_qwen_multi_turn_experiment,
+    select_qwen_multi_turn_scenarios,
+    summarize_qwen_multi_turn_experiment,
 )
 from serviceops_agent.evaluation.rag_end_to_end_experiment import (
     RAGEndToEndCase,
@@ -190,6 +239,15 @@ __all__ = [
     "AgentCaseStabilityResult",
     # 候选晋级聚合门阈值。
     "CandidatePromotionThresholds",
+    "CandidateFailureCategory",
+    # 第48步多轮状态稳定性、记忆投影和低敏报告契约。
+    "ConversationMemoryExpectation",
+    "ConversationStabilityDataset",
+    "ConversationStabilityScenario",
+    "ConversationStabilitySummary",
+    "ConversationStabilityThresholds",
+    "ConversationStabilityTurn",
+    "ConversationStabilityTurnResult",
     "GroundingCaseResult",
     "GroundingEvaluationCase",
     "GroundingEvaluationSummary",
@@ -230,6 +288,19 @@ __all__ = [
     "PublicDemoBlindThresholds",
     # 真实千问聊天 + 确定性检索的稳定 profile 名称。
     "QWEN_CANDIDATE_PROFILE",
+    "QwenMultiTurnExperimentConfig",
+    "QwenMultiTurnExperimentReport",
+    "QwenMultiTurnEvidenceBundle",
+    "QwenMultiTurnEvidenceManifest",
+    "QwenMultiTurnFailureDiagnosis",
+    "QwenMultiTurnResult",
+    "QwenMultiTurnThresholds",
+    "QwenMultiTurnTrialSummary",
+    "QwenScenarioStability",
+    "QwenCandidateComparisonPolicy",
+    "QwenCandidateComparisonReport",
+    "QwenRegressionQueueItem",
+    "QwenScenarioComparison",
     # 单条人工标注评测样本。
     "RAGEvaluationCase",
     # 单条检索运行结果。
@@ -280,10 +351,17 @@ __all__ = [
     "SemanticJudgeVerdict",
     # 构建完全离线且资源隔离的整图评测目标。
     "build_offline_agent_evaluation_target",
+    "archive_qwen_multi_turn_evidence",
+    "build_and_archive_qwen_multi_turn_evidence",
+    "build_qwen_multi_turn_evidence_bundle",
+    "classify_candidate_failure",
+    "compare_qwen_candidate_evidence",
     # 构建真实千问聊天决策但副作用隔离的候选整图。
     "build_qwen_candidate_evaluation_target",
     # 运行完整 LangGraph 并计算端到端指标。
     "evaluate_agent_dataset",
+    "evaluate_conversation_stability",
+    "diagnose_qwen_multi_turn_failures",
     "evaluate_grounding_client",
     "evaluate_grounded_answer_success",
     "evaluate_intent_predictions",
@@ -292,6 +370,9 @@ __all__ = [
     "evaluate_semantic_judge_calibration",
     # 按黄金参考路径估算候选聊天模型调用量。
     "estimate_planned_qwen_chat_calls",
+    "enforce_qwen_multi_turn_budget",
+    "estimate_qwen_multi_turn_chat_calls",
+    "evaluate_qwen_multi_turn_trial",
     # 执行整个 RAG 检索数据集的评测函数。
     "evaluate_retriever",
     "evaluate_rag_end_to_end_pipeline",
@@ -299,6 +380,7 @@ __all__ = [
     "load_agent_evaluation_dataset",
     # 从 UTF-8 JSON 加载版本化候选实验配置。
     "load_candidate_experiment_config",
+    "load_conversation_stability_dataset",
     "load_grounding_evaluation_cases",
     "load_grounding_sufficiency_experiment_config",
     "load_grounded_answer_success_config",
@@ -309,6 +391,9 @@ __all__ = [
     "load_intent_evaluation_cases",
     "load_intent_experiment_config",
     "load_public_demo_blind_config",
+    "load_qwen_multi_turn_config",
+    "load_qwen_candidate_comparison_policy",
+    "load_qwen_multi_turn_evidence_bundle",
     "load_private_semantic_calibration_items",
     "load_semantic_judge_calibration_config",
     # 从受版本控制 JSON 加载评测集。
@@ -323,8 +408,11 @@ __all__ = [
     "load_rag_semantic_embedding_experiment_config",
     # 用受校验命令行值覆盖候选重复轮数。
     "override_candidate_trial_count",
+    "override_qwen_multi_turn_trials",
     # 运行基线和真实候选多轮实验。
     "run_candidate_experiment",
+    "run_qwen_multi_turn_experiment",
+    "render_qwen_candidate_comparison_html",
     "run_grounding_sufficiency_experiment",
     "run_grounded_answer_success_experiment",
     "run_hybrid_grounded_evaluation_replay",
@@ -340,9 +428,12 @@ __all__ = [
     "run_semantic_judge_calibration",
     # 从既有单轮结果聚合稳定性和晋级结论。
     "summarize_candidate_experiment",
+    "select_qwen_multi_turn_scenarios",
+    "summarize_qwen_multi_turn_experiment",
     "validate_grounded_answer_evidence_labels",
     # 把完整私有诊断独占写入git忽略目录，绝不覆盖既有回归文件。
     "write_private_grounded_answer_diagnostics",
+    "write_qwen_candidate_comparison_artifacts",
     "grounding_prompt_sha256",
     "grounded_answer_candidate_fingerprint",
     "hybrid_grounded_evaluator_fingerprint",

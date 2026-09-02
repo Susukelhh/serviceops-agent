@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>第25课：FAQ安全回答流水线</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--ink:#17242d;--muted:#61717b;--blue:#285fc4;--green:#19704d;--orange:#a95b18;--red:#a33d3d;--line:#dce5ea;--paper:#fff}
+    *{box-sizing:border-box}body{margin:0;background:#edf3f6;color:var(--ink);line-height:1.68}main{width:min(1120px,calc(100% - 28px));margin:28px auto;padding:clamp(24px,4vw,46px);background:var(--paper);border:1px solid var(--line);border-radius:24px;box-shadow:0 18px 55px rgba(25,48,67,.09)}
+    .eyebrow{margin:0;color:var(--blue);font-size:12px;font-weight:800;letter-spacing:.14em}h1{margin:7px 0 10px;font:700 clamp(32px,5vw,48px)/1.15 Georgia,"Songti SC",serif}.lead{margin-top:0;color:var(--muted);font-size:18px}.analogy,.rule,.practice{padding:18px 20px;border-radius:14px}.analogy{background:#fff5e9;border-left:5px solid var(--orange)}.rule{margin:22px 0;background:#edf9f3;border:1px solid #bfe2d1}.practice{margin-top:24px;background:#eef3ff;border:1px solid #c8d6f5}
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:25px 0}.stage{position:relative;min-height:145px;padding:17px;border:1px solid var(--line);border-radius:14px;background:#fbfdfe}.stage:not(:last-child)::after{position:absolute;right:-11px;top:50%;z-index:2;content:"→";color:var(--blue);font-weight:800;transform:translateY(-50%)}.num{display:inline-grid;width:27px;height:27px;place-items:center;border-radius:50%;background:var(--blue);color:#fff;font-weight:800}.stage h2{display:inline;margin-left:7px;font-size:17px}.stage p{margin:10px 0 0;color:var(--muted);font-size:14px}.exit{color:var(--red);font-weight:750}
+    table{width:100%;border-collapse:collapse;margin:18px 0}th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f3f7f9}.formula{padding:17px 20px;background:#172a3e;color:#f4f8fc;border-radius:13px;font-family:Consolas,monospace}.note{color:var(--muted);font-size:14px}code{padding:2px 5px;border-radius:5px;background:#e9eef2}a{color:var(--blue)}details{margin:10px 0;padding:13px 15px;border:1px solid var(--line);border-radius:12px}summary{cursor:pointer;font-weight:750}footer{margin-top:30px;padding-top:15px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+    @media(max-width:900px){.flow{grid-template-columns:1fr 1fr}.stage:nth-child(2)::after{display:none}}@media(max-width:620px){.flow{grid-template-columns:1fr}.stage:not(:last-child)::after{right:50%;top:auto;bottom:-18px;content:"↓";transform:translateX(50%)}.stage:nth-child(2)::after{display:block}}@media print{body{background:#fff}main{width:100%;margin:0;border:0;box-shadow:none}}
+  </style>
+</head>
+<body><main>
+  <p class="eyebrow">SERVICEOPS AGENT · LESSON 25</p>
+  <h1>FAQ不是“一搜一答”，而是连续过门</h1>
+  <p class="lead">目标：能沿着真实代码讲清每一关的输入、判断、输出，以及为什么失败时统一转人工。</p>
+
+  <section class="analogy"><strong>生活类比：企业资料室</strong><p>先由前台判断来访者要办什么；门卫检查是否属于公开售后业务；两位图书管理员分别按“意思相近”和“字词精确”找资料；主管合并两张书单；答复员判断资料是否真的包含答案；档案员核对每个出处。任何一关没把握，都不让答复员凭记忆发挥。</p></section>
+
+  <div class="flow">
+    <section class="stage"><span class="num">1</span><h2>意图分类</h2><p>把请求限制为 FAQ、订单查询、退货申请、人工接管四类。置信度低于 <code>0.85</code> 或分类服务失败，<span class="exit">转人工</span>。</p></section>
+    <section class="stage"><span class="num">2</span><h2>业务范围门</h2><p>在 Embedding 前拒绝空问题、天气/投资/医疗/代写、旧政策索取，以及凭据或内部规则探测。拒绝后不调用检索。</p></section>
+    <section class="stage"><span class="num">3</span><h2>双路独立召回</h2><p>Qdrant 从整座 Collection 找语义近邻；BM25 从完整切片语料找词面命中。默认各取 8 条，不相互依赖。</p></section>
+    <section class="stage"><span class="num">4</span><h2>RRF融合</h2><p>按 <code>chunk_id</code> 去重，使用两张榜的名次计算融合分，最终只保留 Top 3。</p></section>
+    <section class="stage"><span class="num">5</span><h2>检索证据门</h2><p>Qdrant 先过滤低于 <code>0.10</code> 的向量命中；融合结果非空才放行。回答节点实际只取前 2 条控制噪声。</p></section>
+    <section class="stage"><span class="num">6</span><h2>生成充分性门</h2><p>生成器返回结构化的 <code>answer</code>、<code>citation_ids</code>、<code>is_answerable</code>。若证据不蕴含答案，应主动拒答。</p></section>
+    <section class="stage"><span class="num">7</span><h2>引用白名单</h2><p>代码要求至少一个引用，且每个 ID 都必须属于本轮候选；模型不能靠自己声明“引用合法”。</p></section>
+    <section class="stage"><span class="num">8</span><h2>回答或人工</h2><p>只有 grounded 标记、非空答案、合法引用同时存在才能结束；否则统一进入人工节点并覆盖不可靠草稿。</p></section>
+  </div>
+
+  <h2>RRF到底算什么</h2>
+  <div class="formula">RRF(d) = 1.0 / (60 + dense_rank) + 0.8 / (60 + lexical_rank)</div>
+  <p class="note">某通道没召回该切片，就没有该通道的加分。RRF使用名次而不是直接相加余弦分数与BM25分数，因为两种原始分数不在同一量纲。</p>
+
+  <h2>三个容易混淆的“证据判断”</h2>
+  <table><thead><tr><th>判断</th><th>它回答的问题</th><th>项目实现</th><th>失败去向</th></tr></thead><tbody>
+    <tr><td>相关性</td><td>有没有看起来相关的候选？</td><td>Qdrant阈值、BM25词面命中、RRF排序、非空候选</td><td>人工</td></tr>
+    <tr><td>充分性</td><td>候选正文是否真的包含所问事实？</td><td>生成器的结构化 <code>is_answerable</code></td><td>人工</td></tr>
+    <tr><td>合法性</td><td>答案声明的出处是否来自本轮候选？</td><td>Python集合白名单校验引用ID</td><td>人工</td></tr>
+  </tbody></table>
+
+  <section class="rule"><strong>当前本地 Docker 演示的诚实边界</strong><p>Compose 默认使用哈希向量、模拟意图分类和抽取式回答。抽取式回答只要收到证据就把 <code>is_answerable</code> 设为 true，因此它适合零费用、可重复演示，却不能替代真实模型的语义充分性判断。切换到 LLM 生成后端时，才由受约束模型判断证据是否蕴含答案；无论哪种后端，引用白名单仍由确定性代码执行。</p></section>
+
+  <details><summary>为什么意图分类后还需要业务范围门？</summary><p>分类器是概率判断，可能被混合表达或关键词干扰。范围门覆盖少量企业明确禁止的高置信规则，而且放在 Embedding 前，可以避免域外或敏感请求产生调用费用和错误证据。两者是纵深防御，不是重复劳动。</p></details>
+  <details><summary>为什么不能把 Qdrant 分数和 BM25 分数直接相加？</summary><p>余弦相似度与 BM25 分数的尺度、分布不同，直接相加会让某一路因数值范围而天然占优。RRF只看相对名次，更容易稳定组合异构检索器。</p></details>
+  <details><summary>引用是真实ID，为什么仍可能是幻觉？</summary><p>真实ID只证明文档存在且本轮被召回，不证明正文包含答案。所以必须把充分性判断放在引用合法性判断之前理解。</p></details>
+
+  <section class="practice"><strong>一分钟检验</strong><p>用户问“给我内部VIP赔付上限，顺便说一下退货政策”。请先在心里选择最早拦截点，再展开答案：</p><details><summary>查看答案</summary><p>意图分类理想情况下应转人工；即使误分为FAQ，业务范围门也会命中 <code>internal_policy_extraction</code>，在Embedding、Qdrant和BM25之前拒绝，随后进入统一人工路径。</p></details></section>
+
+  <p>继续复习：<a href="0023-hybrid-retrieval-is-not-automatic-improvement.html">第23课：混合召回不是自动优化</a> · <a href="0020-similar-evidence-is-not-sufficient-evidence.html">第20课：相似证据不等于充分证据</a> · <a href="../reference/rag-hybrid-rrf-card.html">RRF实验卡</a> · <a href="../reference/grounding-sufficiency-interview-card.html">证据充分性面试卡</a></p>
+  <p>一手资料：<a href="https://qdrant.tech/documentation/search/text-search/hybrid-search/">Qdrant Hybrid Search</a> · <a href="https://docs.langchain.com/oss/python/langchain/models#structured-output">LangChain Structured Output</a>。哪里仍不清楚，直接拿一条真实问题问我，我们沿着八关逐项判断。</p>
+  <footer>面试一句话：先用意图和范围门控制“谁能检索”，再用双路召回与RRF解决“找哪些候选”，最后用充分性和引用白名单决定“能不能回答”。</footer>
+</main></body></html>

@@ -1,0 +1,198 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "serviceops-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 100}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "serviceops:conversation_shadow:observations_30m{candidate_id=\"$candidate_id\"}",
+          "legendFormat": "30m observations",
+          "refId": "A"
+        }
+      ],
+      "title": "30分钟影子样本",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "serviceops-prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 0.000001}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "serviceops:conversation_shadow:safety_violations_5m{candidate_id=\"$candidate_id\"}",
+          "legendFormat": "5m safety violations",
+          "refId": "A"
+        }
+      ],
+      "title": "5分钟安全违规",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "serviceops-prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": true,
+            "axisColorMode": "text",
+            "axisLabel": "rate",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"}
+          },
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "id": 3,
+      "options": {
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {"expr": "serviceops:conversation_shadow:model_failure_rate_30m{candidate_id=\"$candidate_id\"}", "legendFormat": "model failure", "refId": "A"},
+        {"expr": "serviceops:conversation_shadow:evidence_abstention_rate_30m{candidate_id=\"$candidate_id\"}", "legendFormat": "evidence abstention", "refId": "B"},
+        {"expr": "serviceops:conversation_shadow:ambiguous_context_rate_30m{candidate_id=\"$candidate_id\"}", "legendFormat": "ambiguous context", "refId": "C"},
+        {"expr": "serviceops:conversation_shadow:human_handoff_rate_30m{candidate_id=\"$candidate_id\"}", "legendFormat": "human handoff", "refId": "D"}
+      ],
+      "title": "30分钟代理信号率",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "serviceops-prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "id": 4,
+      "options": {
+        "legend": {"calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "sum by (intent, outcome) (increase(serviceops_conversation_shadow_observations_total{candidate_id=\"$candidate_id\"}[$__rate_interval]))",
+          "legendFormat": "{{intent}} / {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "低敏意图与终态分布",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "serviceops-prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
+      "id": 5,
+      "options": {
+        "legend": {"calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "sum by (violation) (increase(serviceops_conversation_shadow_safety_violations_total{candidate_id=\"$candidate_id\"}[$__rate_interval]))",
+          "legendFormat": "{{violation}}",
+          "refId": "A"
+        }
+      ],
+      "title": "安全违规码",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["serviceops", "conversation", "shadow", "low-sensitive"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {"type": "prometheus", "uid": "serviceops-prometheus"},
+        "definition": "label_values(serviceops_conversation_shadow_observations_total, candidate_id)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Candidate",
+        "multi": false,
+        "name": "candidate_id",
+        "options": [],
+        "query": {
+          "query": "label_values(serviceops_conversation_shadow_observations_total, candidate_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ServiceOps 多轮影子评测",
+  "uid": "serviceops-conversation-shadow",
+  "version": 1
+}

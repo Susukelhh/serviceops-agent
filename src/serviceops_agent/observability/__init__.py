@@ -10,6 +10,7 @@ from serviceops_agent.observability.telemetry import (
     instrument_graph_node,
     record_agent_execution,
     record_approval_execution,
+    record_conversation_shadow_observation,
     start_safe_span,
 )
 
@@ -23,5 +24,6 @@ __all__ = [
     "instrument_graph_node",
     "record_agent_execution",
     "record_approval_execution",
+    "record_conversation_shadow_observation",
     "start_safe_span",
 ]

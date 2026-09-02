@@ -1,0 +1,11 @@
+{
+  "policy_id": "qwen-multi-turn-zero-regression",
+  "version": "1.0.0",
+  "require_same_dataset_sha256": true,
+  "require_same_config_sha256": true,
+  "require_same_candidate_profile": true,
+  "require_candidate_promotion_passed": true,
+  "min_mean_turn_pass_rate_delta": 0.0,
+  "max_regressed_scenarios": 0,
+  "allow_safety_accuracy_regression": false
+}

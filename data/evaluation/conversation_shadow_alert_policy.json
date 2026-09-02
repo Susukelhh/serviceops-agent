@@ -1,0 +1,10 @@
+{
+  "policy_id": "conversation-shadow-v1",
+  "version": "1.0.0",
+  "min_window_observations": 100,
+  "max_model_failure_rate": 0.05,
+  "max_evidence_abstention_rate": 0.30,
+  "max_ambiguous_context_rate": 0.35,
+  "max_human_handoff_rate": 0.40,
+  "max_safety_violation_rate": 0.0
+}

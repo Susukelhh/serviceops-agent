@@ -133,10 +133,10 @@ async def test_capacity_guard_rejects_busy_api_but_keeps_health_available(
     assert health_response.status_code == 200
 
 
-# readiness 与 liveness 分离，必须真实访问五个运行时持久化边界。
+# readiness 与 liveness 分离，必须真实访问六个运行时持久化边界。
 @pytest.mark.asyncio
 async def test_readiness_checks_all_runtime_dependencies() -> None:
-    """内存运行时的工作流、业务库、Outbox、审计库和知识索引都应可读。"""
+    """内存运行时的工作流、会话、业务、Outbox、审计和知识索引都应可读。"""
 
     # Arrange：进入真实 lifespan，确保 app.state 使用同一套运行时资源。
     async with (
@@ -146,7 +146,7 @@ async def test_readiness_checks_all_runtime_dependencies() -> None:
             base_url="http://testserver",
         ) as client,
     ):
-        # Act：readiness 会对四类状态存储和 Qdrant 知识索引执行真实只读探测。
+        # Act：readiness 会对五类状态存储和 Qdrant 知识索引执行真实只读探测。
         response = await client.get("/ready")
 
     # Assert：全部依赖可用时返回 200/ready。
@@ -155,6 +155,7 @@ async def test_readiness_checks_all_runtime_dependencies() -> None:
     assert payload["status"] == "ready"
     assert payload["checks"] == {
         "checkpointer": {"status": "ready"},
+        "conversation_repository": {"status": "ready"},
         "return_repository": {"status": "ready"},
         "outbox_repository": {"status": "ready"},
         "audit_repository": {"status": "ready"},

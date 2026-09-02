@@ -16,7 +16,7 @@ class Role(StrEnum):
     RETURN_REVIEWER = "return_reviewer"
     # AUDITOR 代表安全审计员，只能读取审批证据链，不能发起对话或执行审批。
     AUDITOR = "auditor"
-    # OPERATOR 代表平台运维人员，只能触发到期 Outbox 补偿，不读取审计正文。
+    # OPERATOR 代表平台运维人员，可触发低敏补偿与生命周期清理，不读取业务正文。
     OPERATOR = "operator"
     # DEVELOPER 代表本地开发调试人员，只能读取已经脱敏的 LangGraph 教学轨迹。
     # 该角色不拥有普通用户查询、退货审批、审计链读取或运维补偿权限。
@@ -36,6 +36,10 @@ class PermissionScope(StrEnum):
     AUDIT_READ = "audit:read"
     # OUTBOX_RECONCILE 允许触发待处理事务事件补偿，但不能批准或读取审计链。
     OUTBOX_RECONCILE = "operations:reconcile"
+    # CONVERSATION_CLEANUP 允许执行到期会话最小化清理，不允许读取会话正文。
+    CONVERSATION_CLEANUP = "operations:conversation-cleanup"
+    # WORKFLOW_RECOVERY 允许处置陈旧执行租约，只返回低敏分类计数。
+    WORKFLOW_RECOVERY = "operations:workflow-recovery"
     # DEBUG_READ 只允许在 development/test 环境读取脱敏后的状态与 Checkpoint 历史。
     DEBUG_READ = "debug:read"
 
@@ -48,8 +52,14 @@ ROLE_SCOPE_POLICY: dict[Role, frozenset[PermissionScope]] = {
     Role.RETURN_REVIEWER: frozenset({PermissionScope.RETURN_APPROVE}),
     # 审计员遵循职责分离原则，只能读取审计证据，不能批准自己的操作。
     Role.AUDITOR: frozenset({PermissionScope.AUDIT_READ}),
-    # 运维人员只能推进待处理事件，不能查看事件载荷或执行审批。
-    Role.OPERATOR: frozenset({PermissionScope.OUTBOX_RECONCILE}),
+    # 运维人员可推进待处理事件、清理会话和恢复陈旧执行，不能查看载荷或执行审批。
+    Role.OPERATOR: frozenset(
+        {
+            PermissionScope.OUTBOX_RECONCILE,
+            PermissionScope.CONVERSATION_CLEANUP,
+            PermissionScope.WORKFLOW_RECOVERY,
+        }
+    ),
     # 开发调试人员只能读取教学轨迹；生产环境路由还会执行第二道关闭检查。
     Role.DEVELOPER: frozenset({PermissionScope.DEBUG_READ}),
     # 公网访客可完整体验对话、审批、审计与教学回放；各读取路由还会校验线程归属。

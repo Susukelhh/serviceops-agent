@@ -4,6 +4,8 @@
 
 - [LangGraph 官方文档](https://docs.langchain.com/oss/python/langgraph/overview)
   当前 StateGraph、持久化、中断、流式和可靠执行的权威资料；用于校准课程代码和项目架构。
+- [LangGraph Interrupts 官方文档](https://docs.langchain.com/oss/python/langgraph/interrupts)
+  人工审批中断、Checkpoint 与 `Command.resume` 恢复语义的一手资料；用于解释中断前不能放置不可幂等副作用。
 - [LangChain v1 发布说明](https://docs.langchain.com/oss/python/releases/langchain-v1)
   说明现代 `create_agent`、Middleware 和旧式 Chain/Agent API 的迁移边界；用于避免采用逐渐退出主线的接口。
 - [LangChain Models：Structured output](https://docs.langchain.com/oss/python/langchain/models#structured-output)
@@ -26,8 +28,20 @@
   PostgreSQL 向量检索扩展的权威使用资料；用于把业务数据与第一版知识检索统一在 PostgreSQL。
 - [OpenTelemetry Python 官方文档](https://opentelemetry.io/docs/languages/python/)
   Trace 与 Metrics 的标准化可观测资料；用于避免把项目绑定在单一观测平台。
+- [AWS Transactional Outbox Pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)
+  业务记录与待投递事件同事务提交、下游至少一次投递和消费者幂等的一手架构参考。
+- [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
+  日志与审计中敏感信息最小化、访问控制和防篡改保护的安全参考。
+- [NIST SP 800-92：Guide to Computer Security Log Management](https://csrc.nist.gov/pubs/sp/800/92/final)
+  企业日志收集、存储、分析和长期治理生命周期参考；用于界定应用级哈希链与正式审计体系的差距。
 - [LangSmith Evaluation Concepts](https://docs.langchain.com/langsmith/evaluation-concepts)
   离线/在线评测、数据集、参考输出、实验和 Agent 工具轨迹评估的官方概念资料。
+- [LangSmith：Evaluate a RAG application](https://docs.langchain.com/langsmith/evaluate-rag-tutorial)
+  把 RAG 拆成回答正确性、回答相关性、Groundedness 和检索相关性四个评测面；用于避免只看检索分数。
+- [BEIR：异构信息检索基准论文](https://arxiv.org/abs/2104.08663)
+  信息检索评测和跨领域检索基准的一手论文；用于理解 nDCG、Recall 等排序指标必须绑定数据集与 K 值。
+- [RAGAS：RAG 自动评测论文](https://aclanthology.org/2024.eacl-demo.16/)
+  Context、Faithfulness 和 Answer Relevance 等生成阶段评测的一手论文；用于理解 LLM 评测可补充但不能替代人工标签。
 - [LangGraph Test](https://docs.langchain.com/oss/python/langgraph/test)
   有状态图使用新图与独立 Checkpointer、节点测试和部分执行的官方实践。
 - [uv：Using uv in GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/)
@@ -60,6 +74,8 @@
   区分本地应用文件存储与客户端/服务器共享数据库，避免把 SQLite 简单理解为“低级数据库”。
 - [PostgreSQL 官方客户端/服务器架构](https://www.postgresql.org/docs/current/tutorial-arch.html)
   说明数据库服务如何管理数据文件、接受多个客户端连接并通过网络与应用协作。
+- [Alembic 官方文档](https://alembic.sqlalchemy.org/en/latest/)
+  SQLAlchemy项目的数据库结构版本迁移工具；用于按revision链执行可追踪的结构升级。
 - [LangGraph 官方生产持久化示例](https://docs.langchain.com/oss/python/langgraph/add-memory)
   说明 Checkpointer 如何保存线程状态，以及生产场景使用 PostgreSQL 后端的基本边界。
 - [尚硅谷 LangGraph 课程笔记](https://github.com/xbsheng/atguigu-note/tree/main/langgraph)

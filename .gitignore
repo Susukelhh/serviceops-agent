@@ -15,6 +15,10 @@ __pycache__/
 .coverage
 htmlcov/
 
+# 本地测试沙盒和一次性文档/PDF检查产物不属于发布源码
+.tmp/
+tmp/
+
 # 构建产物
 build/
 dist/
