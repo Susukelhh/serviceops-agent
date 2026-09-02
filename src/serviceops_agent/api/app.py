@@ -7,6 +7,9 @@ API 层只负责协议转换：校验 HTTP 请求、调用领域状态图、序�
 # asyncio.BoundedSemaphore 为每个 API 进程提供有限业务工位；wait_for 实现短排队超时。
 import asyncio
 
+# json 把结构化业务事件编码为浏览器原生 EventSource/流式 fetch 可消费的 SSE 数据。
+import json
+
 # logging 记录审计证据的读取行为，但不记录 Bearer Token 或敏感业务原文。
 import logging
 
@@ -47,8 +50,8 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 # RequestResponseEndpoint 为 HTTP middleware 的下一个处理器提供严格异步类型。
 from starlette.middleware.base import RequestResponseEndpoint
 
-# JSONResponse 在容量耗尽时返回固定脱敏 503，不进入模型、图或数据库。
-from starlette.responses import FileResponse, JSONResponse, RedirectResponse
+# JSONResponse 在容量耗尽时返回固定脱敏 503；StreamingResponse 持续发送工作流事件。
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 # StaticFiles 只托管版本控制的 CSS/JavaScript，不允许浏览任意项目目录。
 from starlette.staticfiles import StaticFiles
@@ -73,7 +76,12 @@ from serviceops_agent.api.schemas import (
     ConversationMessageResponse,
     ConversationTurnSummary,
     DependencyCheck,
+    FeedbackCreateRequest,
+    FeedbackCreateResponse,
+    FeedbackQueueResponse,
+    FeedbackReviewRequest,
     HealthResponse,
+    KnowledgeCandidateQueueResponse,
     PublicDemoSessionResponse,
     ReadinessResponse,
     ThreadDebugResponse,
@@ -123,6 +131,13 @@ from serviceops_agent.domain.conversation import (
 # 进入记忆的最近意图必须仍属于图允许的有限枚举。
 from serviceops_agent.domain.enums import Intent
 
+# 反馈信号和审核决定使用有限领域类型，不把任意标签写入问题池。
+from serviceops_agent.domain.feedback import (
+    FeedbackReason,
+    FeedbackReview,
+    FeedbackSignal,
+)
+
 # RAG引用只有在grounded终态下才允许进入可信来源记忆。
 from serviceops_agent.domain.knowledge import Citation
 
@@ -162,6 +177,14 @@ from serviceops_agent.infrastructure.conversation_repository import (
     ConversationUnavailableError,
     ConversationVersionConflictError,
     InMemoryConversationRepository,
+)
+
+# 问题池仓库与会话仓库分离，支持幂等反馈、人工归因和知识候选导出。
+from serviceops_agent.infrastructure.feedback_repository import (
+    FeedbackConflictError,
+    FeedbackNotFoundError,
+    FeedbackRepository,
+    InMemoryFeedbackRepository,
 )
 
 # Outbox 协议用于 readiness、即时协调和受权运维重试。
@@ -233,6 +256,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.approval_audit_repository = runtime.approval_audit_repository
         # 多轮API与后续上下文构建器共享同一会话仓库实例。
         application.state.conversation_repository = runtime.conversation_repository
+        # 用户反馈、自动转人工信号和知识候选共享同一持久化后端。
+        application.state.feedback_repository = runtime.feedback_repository
         # 会话删除通过显式最小依赖清理 Checkpoint，不读取编译图内部实现。
         application.state.checkpoint_deleter = runtime.checkpoint_deleter
         # readiness 使用真实后端仓库执行只读探测。
@@ -253,7 +278,7 @@ app = FastAPI(
     # Swagger 页面标题来自配置，可通过 SERVICEOPS_APP_NAME 环境变量覆盖。
     title=settings.app_name,
     # API 版本用于接口文档展示；后续发布时应与项目版本保持同步。
-    version="0.1.0",
+    version="1.0.0",
     # 简短说明当前服务的业务用途和开发阶段。
     description="企业售后工单 Agent 的第一版可运行 API",
     # lifespan 负责持久化资源的启动失败、共享和优雅关闭。
@@ -292,6 +317,9 @@ async def protect_agent_capacity(
 
     # 只有 /api/ 业务路径会执行 Agent、审批、审计或补偿；系统探针与 Swagger 不占工位。
     if not request.url.path.startswith("/api/") or request.method == "OPTIONS":
+        return await call_next(request)
+    # SSE 路由在响应生成器的完整生命周期内自行持有工位，避免响应头返回后过早释放。
+    if request.url.path.endswith("/messages/stream"):
         return await call_next(request)
     # 从 app.state 取得当前 lifespan 创建的信号量；轻量测试使用模块初始化的后备实例。
     limiter = cast(asyncio.BoundedSemaphore, request.app.state.agent_capacity_limiter)
@@ -346,6 +374,8 @@ app.state.persistence_backend = "memory"
 app.state.approval_audit_repository = InMemoryApprovalAuditRepository()
 # 无 lifespan 的轻量ASGI测试也需要独立会话仓库，不能复用生产SQLite文件。
 app.state.conversation_repository = InMemoryConversationRepository()
+# 无 lifespan 的 API 测试使用隔离反馈问题池。
+app.state.feedback_repository = InMemoryFeedbackRepository()
 
 
 class _UnavailableCheckpointDeleter:
@@ -469,6 +499,12 @@ def _get_conversation_repository() -> ConversationRepository:
     """取得当前运行时的会话、轮次和结构化记忆仓库。"""
 
     return cast(ConversationRepository, app.state.conversation_repository)
+
+
+def _get_feedback_repository() -> FeedbackRepository:
+    """取得与当前会话后端匹配的反馈问题池。"""
+
+    return cast(FeedbackRepository, app.state.feedback_repository)
 
 
 def _get_checkpoint_deleter() -> CheckpointDeleter:
@@ -933,6 +969,45 @@ def _conversation_message_response(
     )
 
 
+def _encode_sse_event(
+    *,
+    event: str,
+    data: dict[str, Any],
+    event_id: int,
+) -> bytes:
+    """把一个有限 JSON 对象编码为不含原始换行的标准 SSE 事件。"""
+
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    return f"id: {event_id}\nevent: {event}\ndata: {payload}\n\n".encode()
+
+
+def _record_automatic_handoff_feedback(
+    *,
+    turn: ConversationTurnRecord,
+    chat_response: ChatResponse,
+    owner_user_id: str,
+) -> None:
+    """把非审批型人工接管作为低优先级自动信号写入问题池。"""
+
+    if not chat_response.requires_human or chat_response.approval_required:
+        return
+    try:
+        _get_feedback_repository().record(
+            turn=turn,
+            owner_user_id=owner_user_id,
+            idempotency_key=f"auto:{turn.turn_id}:handoff",
+            signal=FeedbackSignal.AUTO_HANDOFF,
+            reason=FeedbackReason.OTHER,
+        )
+    except Exception as error:
+        # 问题池属于改进旁路；失败不能改变已经安全完成的用户响应。
+        logger.warning(
+            "自动反馈信号写入失败: cause_type=%s",
+            type(error).__name__,
+            extra={"operation": "feedback_auto_capture", "failure_code": "repository"},
+        )
+
+
 async def _delete_prepared_conversation_artifacts(
     *,
     repository: ConversationRepository,
@@ -944,6 +1019,10 @@ async def _delete_prepared_conversation_artifacts(
     # 每个工作流线程独立删除；任一失败都会中止物理业务删除，保留计划供重试。
     for workflow_thread_id in plan.workflow_thread_ids:
         await checkpoint_deleter.adelete_thread(str(workflow_thread_id))
+    # 反馈可能保存问题和候选答案，必须与用户会话一起进入隐私删除边界。
+    _get_feedback_repository().delete_for_conversation(
+        conversation_id=plan.conversation_id
+    )
     return repository.delete_prepared_conversation(plan=plan)
 
 
@@ -1229,6 +1308,7 @@ async def send_conversation_message(
         with start_safe_span(
             "serviceops.agent.conversation_turn",
             attributes={
+                "langfuse.trace.name": "serviceops.conversation_turn",
                 "serviceops.request.id": request_id,
                 "serviceops.thread.id": thread_id,
                 "serviceops.conversation.id": str(conversation_id),
@@ -1341,10 +1421,249 @@ async def send_conversation_message(
             ),
             safety_violation_codes=shadow_observation.safety_violation_codes,
         )
+    _record_automatic_handoff_feedback(
+        turn=turn,
+        chat_response=chat_response,
+        owner_user_id=principal.subject,
+    )
     return _conversation_message_response(
         chat_response=chat_response,
         turn=turn,
         replayed=False,
+    )
+
+
+@app.post(
+    "/api/v1/conversations/{conversation_id}/messages/stream",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "content": {"text/event-stream": {}},
+            "description": "工作流已接收、执行中和最终结果事件",
+        },
+        503: {"description": "实例容量已满"},
+    },
+    tags=["conversation"],
+)
+async def stream_conversation_message(
+    conversation_id: UUID,
+    request: ConversationMessageRequest,
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.AGENT_CHAT.value]),
+    ],
+) -> StreamingResponse:
+    """以 SSE 发送工作流生命周期；最终 result 事件与同步接口模型完全一致。"""
+
+    # 普通容量中间件会在响应头返回时释放工位；流式路由必须持有到生成器真正结束。
+    limiter = cast(asyncio.BoundedSemaphore, app.state.agent_capacity_limiter)
+    try:
+        await asyncio.wait_for(
+            limiter.acquire(),
+            timeout=settings.agent_capacity_queue_timeout_seconds,
+        )
+    except TimeoutError as error:
+        record_capacity_rejection()
+        raise HTTPException(
+            status_code=503,
+            detail="服务当前繁忙，请稍后重试",
+            headers={"Retry-After": "1", "X-ServiceOps-Overload": "capacity"},
+        ) from error
+
+    async def event_stream() -> AsyncIterator[bytes]:
+        task: asyncio.Task[ConversationMessageResponse] | None = None
+        event_id = 1
+        try:
+            yield _encode_sse_event(
+                event="accepted",
+                event_id=event_id,
+                data={"conversation_id": str(conversation_id), "phase": "accepted"},
+            )
+            task = asyncio.create_task(
+                send_conversation_message(conversation_id, request, principal)
+            )
+            while not task.done():
+                done, _ = await asyncio.wait({task}, timeout=5.0)
+                if done:
+                    break
+                event_id += 1
+                yield _encode_sse_event(
+                    event="progress",
+                    event_id=event_id,
+                    data={"conversation_id": str(conversation_id), "phase": "running"},
+                )
+            result = task.result()
+            event_id += 1
+            yield _encode_sse_event(
+                event="result",
+                event_id=event_id,
+                data=result.model_dump(mode="json"),
+            )
+        except HTTPException as error:
+            event_id += 1
+            yield _encode_sse_event(
+                event="error",
+                event_id=event_id,
+                data={
+                    "status_code": error.status_code,
+                    "detail": error.detail,
+                    "retryable": error.status_code in {409, 429, 503},
+                },
+            )
+        except asyncio.CancelledError:
+            # 客户端断开时取消尚未完成的本地图任务，租约保护会阻止过期执行者提交结果。
+            raise
+        except Exception as error:
+            logger.exception(
+                "SSE 会话执行失败: cause_type=%s",
+                type(error).__name__,
+                extra={"operation": "conversation_stream", "failure_code": "execution"},
+            )
+            event_id += 1
+            yield _encode_sse_event(
+                event="error",
+                event_id=event_id,
+                data={
+                    "status_code": 500,
+                    "detail": "工作流执行失败，请使用相同幂等键查询或重试",
+                    "retryable": True,
+                },
+            )
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            limiter.release()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post(
+    "/api/v1/conversations/{conversation_id}/turns/{turn_id}/feedback",
+    response_model=FeedbackCreateResponse,
+    status_code=201,
+    tags=["feedback"],
+)
+async def create_turn_feedback(
+    conversation_id: UUID,
+    turn_id: UUID,
+    request: FeedbackCreateRequest,
+    response: Response,
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.AGENT_CHAT.value]),
+    ],
+) -> FeedbackCreateResponse:
+    """让用户只对自己已经持久化的一轮结果提交幂等反馈。"""
+
+    turn = _get_conversation_repository().get_turn_for_owner(
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        owner_user_id=principal.subject,
+    )
+    if turn is None:
+        raise HTTPException(status_code=404, detail="未找到可反馈的会话轮次")
+    if turn.status not in {
+        ConversationTurnStatus.COMPLETED,
+        ConversationTurnStatus.WAITING_APPROVAL,
+    }:
+        raise HTTPException(status_code=409, detail="该轮结果尚未完成，暂不能反馈")
+    try:
+        record, created = _get_feedback_repository().record(
+            turn=turn,
+            owner_user_id=principal.subject,
+            idempotency_key=request.idempotency_key,
+            signal=FeedbackSignal(request.signal),
+            reason=request.reason,
+        )
+    except FeedbackConflictError as error:
+        raise HTTPException(status_code=409, detail="反馈幂等键已用于另一请求") from error
+    if not created:
+        response.status_code = 200
+    return FeedbackCreateResponse(
+        feedback_id=record.feedback_id,
+        signal=record.signal,
+        status=record.status,
+        replayed=not created,
+    )
+
+
+@app.get(
+    "/api/v1/internal/feedback",
+    response_model=FeedbackQueueResponse,
+    tags=["feedback-operations"],
+)
+async def list_feedback_queue(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.FEEDBACK_REVIEW.value]),
+    ],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> FeedbackQueueResponse:
+    """向知识审核员返回有限开放问题池，不向普通用户暴露其他会话。"""
+
+    _ = principal
+    return FeedbackQueueResponse(items=_get_feedback_repository().list_open(limit=limit))
+
+
+@app.post(
+    "/api/v1/internal/feedback/{feedback_id}/review",
+    response_model=FeedbackQueueResponse,
+    tags=["feedback-operations"],
+)
+async def review_feedback_item(
+    feedback_id: UUID,
+    request: FeedbackReviewRequest,
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.FEEDBACK_REVIEW.value]),
+    ],
+) -> FeedbackQueueResponse:
+    """对失败问题做一次不可静默覆盖的人工归因。"""
+
+    try:
+        decision = FeedbackReview(
+            category=request.category,
+            proposed_title=request.proposed_title,
+            proposed_answer=request.proposed_answer,
+        )
+        reviewed = _get_feedback_repository().review(
+            feedback_id=feedback_id,
+            reviewer_id=principal.subject,
+            decision=decision,
+        )
+    except FeedbackNotFoundError as error:
+        raise HTTPException(status_code=404, detail="未找到反馈项") from error
+    except FeedbackConflictError as error:
+        raise HTTPException(status_code=409, detail="反馈已经由另一审核决定处置") from error
+    return FeedbackQueueResponse(items=[reviewed])
+
+
+@app.get(
+    "/api/v1/internal/feedback/knowledge-candidates",
+    response_model=KnowledgeCandidateQueueResponse,
+    tags=["feedback-operations"],
+)
+async def list_feedback_knowledge_candidates(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Security(require_principal, scopes=[PermissionScope.FEEDBACK_REVIEW.value]),
+    ],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> KnowledgeCandidateQueueResponse:
+    """导出已审核知识候选，后续仍必须经过离线评测和版本化发布。"""
+
+    _ = principal
+    return KnowledgeCandidateQueueResponse(
+        candidates=_get_feedback_repository().list_knowledge_candidates(limit=limit)
     )
 
 
@@ -1382,6 +1701,7 @@ async def chat(
     with start_safe_span(
         "serviceops.agent.chat",
         attributes={
+            "langfuse.trace.name": "serviceops.chat",
             # request/thread 标识只进入 Trace，不进入低基数 Metrics。
             "serviceops.request.id": request_id,
             "serviceops.thread.id": thread_id,
@@ -1588,6 +1908,7 @@ async def review_return_request(
         with start_safe_span(
             "serviceops.agent.approval_resume",
             attributes={
+                "langfuse.trace.name": "serviceops.approval_resume",
                 "serviceops.request.id": original_request_id,
                 "serviceops.thread.id": stable_thread_id,
                 "serviceops.operation": "approval",

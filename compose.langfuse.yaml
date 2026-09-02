@@ -1,0 +1,18 @@
+# 与 compose.yaml 叠加，把两只 Agent 的安全 Trace 直送 Langfuse v4 OTLP。
+services:
+  agent-a:
+    env_file:
+      - path: .env.langfuse
+        required: true
+    environment:
+      SERVICEOPS_TELEMETRY_ENABLED: "true"
+      SERVICEOPS_TELEMETRY_EXPORTER: langfuse_otlp
+
+  agent-b:
+    env_file:
+      - path: .env.langfuse
+        required: true
+    environment:
+      SERVICEOPS_TELEMETRY_ENABLED: "true"
+      SERVICEOPS_TELEMETRY_EXPORTER: langfuse_otlp
+

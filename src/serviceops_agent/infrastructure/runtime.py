@@ -52,6 +52,14 @@ from serviceops_agent.infrastructure.conversation_repository import (
     SQLiteConversationRepository,
 )
 
+# 反馈问题池与会话仓库共享持久化后端，但使用独立协议和表。
+from serviceops_agent.infrastructure.feedback_repository import (
+    FeedbackRepository,
+    InMemoryFeedbackRepository,
+    PostgresFeedbackRepository,
+    SQLiteFeedbackRepository,
+)
+
 # 订单仓库是退货写入前归属和状态二次检查的数据源。
 from serviceops_agent.infrastructure.order_repository import (
     OrderRepository,
@@ -102,6 +110,8 @@ class AgentRuntime:
     approval_audit_repository: ApprovalAuditRepository
     # conversation_repository 保存会话所有权、轮次幂等状态和有限结构化记忆。
     conversation_repository: ConversationRepository
+    # feedback_repository 保存用户评价、自动转人工信号和人工知识候选。
+    feedback_repository: FeedbackRepository
     # checkpoint_deleter 显式暴露会话清理能力，API 不读取编译图的内部属性。
     checkpoint_deleter: CheckpointDeleter
     # knowledge_retriever 同时服务 LangGraph FAQ 节点和 /ready 的 Qdrant 只读探测。
@@ -131,9 +141,13 @@ async def create_agent_runtime(
         "graph:faq_candidates_fused_rrf"
         if settings.rag_reranker == "hybrid_rrf"
         else (
-            "graph:faq_candidates_reranked_bm25"
-            if settings.rag_reranker == "bm25"
-            else None
+            "graph:faq_candidates_reranked_cross_encoder"
+            if settings.rag_reranker == "cross_encoder"
+            else (
+                "graph:faq_candidates_reranked_bm25"
+                if settings.rag_reranker == "bm25"
+                else None
+            )
         )
     )
 
@@ -145,6 +159,8 @@ async def create_agent_runtime(
         memory_audit_repository = InMemoryApprovalAuditRepository()
         # 会话状态使用同一运行时生命周期，但不与 LangGraph Checkpoint 混为一张记录。
         memory_conversation_repository = InMemoryConversationRepository()
+        # 反馈与会话同属当前内存生命周期，不会污染其他测试或进程。
+        memory_feedback_repository = InMemoryFeedbackRepository()
         # 当前进程创建独立 Checkpointer。
         memory_checkpointer = InMemorySaver(serde=create_checkpoint_serializer())
         # 图同时绑定这两个内存依赖。
@@ -162,6 +178,7 @@ async def create_agent_runtime(
             return_outbox_repository=memory_return_repository,
             approval_audit_repository=memory_audit_repository,
             conversation_repository=memory_conversation_repository,
+            feedback_repository=memory_feedback_repository,
             checkpoint_deleter=memory_checkpointer,
             knowledge_retriever=knowledge_retriever,
             persistence_backend="memory",
@@ -184,6 +201,10 @@ async def create_agent_runtime(
         )
         # 会话表属于业务索引，与退货/审计表共用业务数据库而不是 Checkpoint 数据库。
         sqlite_conversation_repository = SQLiteConversationRepository(
+            database_path=business_database_path,
+        )
+        # SQLite反馈仓库复用业务数据库文件，但维护独立问题池表。
+        sqlite_feedback_repository = SQLiteFeedbackRepository(
             database_path=business_database_path,
         )
         # Checkpoint 数据库与业务数据库分开，强调两者生命周期和职责不同。
@@ -214,6 +235,7 @@ async def create_agent_runtime(
                 return_outbox_repository=sqlite_return_repository,
                 approval_audit_repository=sqlite_audit_repository,
                 conversation_repository=sqlite_conversation_repository,
+                feedback_repository=sqlite_feedback_repository,
                 checkpoint_deleter=sqlite_checkpointer,
                 knowledge_retriever=knowledge_retriever,
                 persistence_backend="sqlite",
@@ -250,6 +272,8 @@ async def create_agent_runtime(
         postgres_conversation_repository = PostgresConversationRepository(
             pool=postgres_pool,
         )
+        # 多实例反馈问题池通过同一连接池共享幂等键和审核状态。
+        postgres_feedback_repository = PostgresFeedbackRepository(pool=postgres_pool)
         # 官方异步 Saver 单独管理 LangGraph Checkpoint 连接和表结构。
         async with AsyncPostgresSaver.from_conn_string(
             postgres_dsn,
@@ -273,6 +297,7 @@ async def create_agent_runtime(
                 return_outbox_repository=postgres_return_repository,
                 approval_audit_repository=postgres_audit_repository,
                 conversation_repository=postgres_conversation_repository,
+                feedback_repository=postgres_feedback_repository,
                 checkpoint_deleter=postgres_checkpointer,
                 knowledge_retriever=knowledge_retriever,
                 persistence_backend="postgres",

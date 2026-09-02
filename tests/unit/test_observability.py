@@ -26,6 +26,7 @@ from serviceops_agent.config.settings import Settings
 from serviceops_agent.observability.telemetry import (
     TraceJsonFormatter,
     _build_telemetry_resource,
+    _parse_otlp_headers,
     current_trace_id,
 )
 
@@ -129,3 +130,27 @@ def test_shadow_candidate_id_rejects_high_cardinality_or_promql_text() -> None:
 
     with pytest.raises(ValidationError):
         Settings(conversation_shadow_candidate_id='candidate-a"} or vector(1)')
+
+
+def test_langfuse_otlp_headers_are_parsed_without_damaging_base64_padding() -> None:
+    headers = _parse_otlp_headers(
+        "Authorization=Basic cHVibGljOnNlY3JldA==,x-langfuse-ingestion-version=4"
+    )
+
+    assert headers == {
+        "Authorization": "Basic cHVibGljOnNlY3JldA==",
+        "x-langfuse-ingestion-version": "4",
+    }
+
+
+def test_langfuse_exporter_requires_secret_headers() -> None:
+    with pytest.raises(ValidationError, match="鉴权 Header"):
+        Settings(
+            telemetry_exporter="langfuse_otlp",
+            otel_otlp_endpoint="https://cloud.langfuse.com/api/public/otel",
+        )
+
+
+def test_otlp_header_parser_rejects_case_insensitive_duplicate_keys() -> None:
+    with pytest.raises(ValueError, match="格式无效"):
+        _parse_otlp_headers("Authorization=one,authorization=two")

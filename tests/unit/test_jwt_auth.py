@@ -118,6 +118,21 @@ def test_workflow_recovery_scope_belongs_only_to_operator() -> None:
     } == {Role.OPERATOR}
 
 
+def test_knowledge_curator_has_only_feedback_review_scope() -> None:
+    """知识审核员不能借问题池权限获得其他业务或运维能力。"""
+
+    settings = get_settings()
+    token = create_access_token(
+        settings=settings,
+        subject="curator-001",
+        roles={Role.KNOWLEDGE_CURATOR},
+    )
+
+    principal = decode_access_token(token=token, settings=settings)
+
+    assert principal.scopes == frozenset({PermissionScope.FEEDBACK_REVIEW})
+
+
 def test_expired_token_is_rejected_with_generic_401() -> None:
     """签名正确但已经过期的 Token 也必须在进入 API 前被拒绝。"""
 

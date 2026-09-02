@@ -107,7 +107,7 @@ const elements = {
 
 // state 不会序列化到浏览器存储或 URL。
 const state = {
-  // 普通用户 Token 只用于 /api/v1/chat。
+  // 普通用户 Token 只用于受保护的多轮会话 API。
   customerToken: "",
   // 审批 Token 只用于恢复退货 interrupt。
   reviewerToken: "",
@@ -127,6 +127,8 @@ const state = {
   demoCountdownTimer: null,
   // currentThreadId 保存最近一次后端生成的 LangGraph 线程 UUID。
   currentThreadId: "",
+  // currentConversationId 保存本页多轮会话 UUID；刷新页面后不会写入浏览器存储。
+  currentConversationId: "",
   // pendingApproval 保存后端返回的最小审批负载。
   pendingApproval: null,
   // requestRunning 防止同一页面重复提交并发请求。
@@ -423,6 +425,90 @@ const requestJson = async (path, options = {}) => {
   };
   // payload 保持后端原结构，渲染函数会逐字段白名单读取。
   return { payload, meta };
+};
+
+// parseSseBlock 只解析后端固定 event/data 字段，忽略注释和未知 SSE 扩展字段。
+const parseSseBlock = (block) => {
+  let eventName = "message";
+  const dataLines = [];
+  block.split("\n").forEach((line) => {
+    if (line.startsWith("event: ")) {
+      eventName = line.slice(7);
+    } else if (line.startsWith("data: ")) {
+      dataLines.push(line.slice(6));
+    }
+  });
+  if (dataLines.length === 0) {
+    return null;
+  }
+  return { eventName, payload: JSON.parse(dataLines.join("\n")) };
+};
+
+// requestSse 使用流式 fetch 支持带 JSON 请求体和 Authorization 的 POST SSE。
+const requestSse = async (path, options = {}, onEvent = () => {}) => {
+  const headers = {
+    Accept: "text/event-stream",
+    "Content-Type": "application/json",
+  };
+  if (options.token) {
+    headers.Authorization = `Bearer ${options.token}`;
+  }
+  const response = await fetch(path, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(options.body || {}),
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  const meta = {
+    instanceId: response.headers.get("x-serviceops-instance") || "unknown",
+    gateway: response.headers.get("x-serviceops-gateway") || "direct",
+  };
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json") ? await response.json() : null;
+    const fallback = `请求失败（HTTP ${response.status}）`;
+    throw new ApiRequestError(response.status, extractErrorMessage(payload, fallback));
+  }
+  if (!response.body) {
+    throw new ApiRequestError(502, "浏览器没有收到可读取的流式响应");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let resultPayload = null;
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const parsed = parseSseBlock(block);
+      if (parsed) {
+        onEvent(parsed.eventName, parsed.payload);
+        if (parsed.eventName === "result") {
+          resultPayload = parsed.payload;
+        }
+        if (parsed.eventName === "error") {
+          const status = Number(parsed.payload.status_code) || 500;
+          const detail = typeof parsed.payload.detail === "string"
+            ? parsed.payload.detail
+            : `流式请求失败（HTTP ${status}）`;
+          throw new ApiRequestError(status, detail);
+        }
+      }
+      boundary = buffer.indexOf("\n\n");
+    }
+    if (done) {
+      break;
+    }
+  }
+  if (!resultPayload) {
+    throw new ApiRequestError(502, "流式响应在最终结果前结束");
+  }
+  return { payload: resultPayload, meta };
 };
 
 // friendlyErrorMessage 把常见保护边界翻译成通俗说明。
@@ -1297,25 +1383,21 @@ const renderChatResponse = (payload, meta, fromApproval = false) => {
 
 /* ---------- 对话提交与页面重置 ---------- */
 
-// ensureIdempotencyKey 为退货类演示生成稳定格式的本次页面幂等键。
-const ensureIdempotencyKey = (message) => {
+// ensureIdempotencyKey 为每轮消息生成稳定格式的客户端幂等键。
+const ensureIdempotencyKey = () => {
   // 已填写时保持用户提供的合法值，真正格式仍由后端校验。
   const existing = elements.idempotencyInput.value.trim();
   if (existing) {
     return existing;
   }
-  // 只有明显退货语句才自动生成，普通只读请求不需要幂等键。
-  if (!message.includes("退货")) {
-    return "";
-  }
   // randomUUID 来自浏览器密码学随机源，并移除连字符缩短展示。
-  const generated = `console-return-${crypto.randomUUID().replaceAll("-", "")}`;
+  const generated = `console-turn-${crypto.randomUUID().replaceAll("-", "")}`;
   // 写回输入框方便用户理解重试时应复用同一键。
   elements.idempotencyInput.value = generated;
   return generated;
 };
 
-// submitChat 调用真实 /api/v1/chat。
+// submitChat 创建或复用真实多轮会话，并通过 SSE 执行本轮独立工作流。
 const submitChat = async (event) => {
   // 阻止浏览器传统表单导航和页面刷新。
   event.preventDefault();
@@ -1337,8 +1419,8 @@ const submitChat = async (event) => {
     elements.messageInput.focus();
     return;
   }
-  // 对退货文本生成本页幂等键；只读请求保持空。
-  const idempotencyKey = ensureIdempotencyKey(message);
+  // 每轮消息都必须可安全重试；失败时输入框会保留同一个键。
+  const idempotencyKey = ensureIdempotencyKey();
   // 每个新请求先清除旧审批和审计卡片，防止误操作上一线程。
   state.pendingApproval = null;
   elements.approvalCard.classList.add("hidden");
@@ -1350,19 +1432,33 @@ const submitChat = async (event) => {
   setRequestControls(true);
   setConversationState("状态图执行中", "running");
   try {
-    // 请求体严格只包含 Schema 允许的 message 和可选幂等键。
-    const body = { message };
-    if (idempotencyKey) {
-      body.idempotency_key = idempotencyKey;
+    // 当前页面第一次发送时创建服务端会话，后续消息复用同一 conversation_id。
+    if (!state.currentConversationId) {
+      const created = await requestJson("/api/v1/conversations", {
+        method: "POST",
+        token: state.customerToken,
+      });
+      state.currentConversationId = String(created.payload.conversation_id || "");
+      if (!state.currentConversationId) {
+        throw new ApiRequestError(502, "后端没有返回会话标识");
+      }
     }
-    // 身份通过 Authorization Header 传递，绝不加入 body.user_id。
-    const result = await requestJson("/api/v1/chat", {
-      method: "POST",
+    // 身份通过 Authorization Header 传递，SSE body 只含消息和幂等键。
+    const streamPath = `/api/v1/conversations/${encodeURIComponent(state.currentConversationId)}/messages/stream`;
+    const result = await requestSse(streamPath, {
       token: state.customerToken,
-      body,
+      body: { message, idempotency_key: idempotencyKey },
+    }, (eventName) => {
+      if (eventName === "accepted") {
+        setConversationState("请求已接收", "running");
+      } else if (eventName === "progress") {
+        setConversationState("状态图执行中", "running");
+      }
     });
     // 成功响应交给统一渲染。
     renderChatResponse(result.payload, result.meta);
+    // 下一轮必须使用新键；只有失败时才保留当前键供安全重试。
+    elements.idempotencyInput.value = "";
     // 配置了 developer Token 时自动载入；未配置时保留明确锁定提示且不弹窗打断。
     await loadDebugTrace(true);
   } catch (error) {
@@ -1380,6 +1476,7 @@ const submitChat = async (event) => {
 const resetWorkspace = () => {
   // 清除当前线程和待审批引用，防止继续操作旧流程。
   state.currentThreadId = "";
+  state.currentConversationId = "";
   state.pendingApproval = null;
   state.debugTrace = null;
   state.selectedCheckpointIndex = -1;

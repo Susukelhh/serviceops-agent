@@ -103,7 +103,9 @@ async def test_console_static_assets_are_served_with_expected_types() -> None:
     # Assert：样式和脚本均是项目专用内容，不是空壳占位文件。
     assert ".content-grid" in css_response.text
     assert "requestJson" in js_response.text
-    assert "/api/v1/chat" in js_response.text
+    assert "/api/v1/conversations" in js_response.text
+    assert "/messages/stream" in js_response.text
+    assert "requestSse" in js_response.text
     assert "/api/v1/approvals/" in js_response.text
     assert "/api/v1/audit/approvals/" in js_response.text
     assert "/api/v1/debug/threads/" in js_response.text

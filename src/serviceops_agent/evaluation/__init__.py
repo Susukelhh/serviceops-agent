@@ -204,6 +204,14 @@ from serviceops_agent.evaluation.rag_semantic_embedding_experiment import (
     load_rag_semantic_embedding_experiment_config,
     run_rag_semantic_embedding_experiment,
 )
+from serviceops_agent.evaluation.ragas_adapter import (
+    Ragas04IdMetricRuntime,
+    RagasDependencyError,
+    RagasIdMetricRuntime,
+    RagasRetrievalCaseResult,
+    RagasRetrievalSummary,
+    evaluate_retrieval_with_ragas,
+)
 from serviceops_agent.evaluation.semantic_judge_calibration import (
     LangChainSemanticJudgeClient,
     SemanticJudgeCalibrationConfig,
@@ -341,6 +349,11 @@ __all__ = [
     "RAGSemanticEmbeddingExperimentReport",
     "RAGSemanticProfileResult",
     "RAGSemanticQualityGate",
+    "Ragas04IdMetricRuntime",
+    "RagasDependencyError",
+    "RagasIdMetricRuntime",
+    "RagasRetrievalCaseResult",
+    "RagasRetrievalSummary",
     # 第39步人工校准的语义完整性Judge契约、结果与报告。
     "LangChainSemanticJudgeClient",
     "SemanticJudgeCalibrationConfig",
@@ -375,6 +388,7 @@ __all__ = [
     "evaluate_qwen_multi_turn_trial",
     # 执行整个 RAG 检索数据集的评测函数。
     "evaluate_retriever",
+    "evaluate_retrieval_with_ragas",
     "evaluate_rag_end_to_end_pipeline",
     # 从 UTF-8 JSON 加载端到端数据集。
     "load_agent_evaluation_dataset",

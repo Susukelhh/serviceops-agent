@@ -280,8 +280,9 @@ def build_default_knowledge_retriever(
     if current_settings.rag_reranker == "off":
         # 原检索器已经可以直接处理search。
         return retriever
-    # 完整混合模式让两路检索器分别读取全语料，再按名次融合。
-    if current_settings.rag_reranker == "hybrid_rrf":
+    # 完整混合模式和 Cross-Encoder 都先独立召回向量与词面候选。
+    first_stage_retriever: HealthCheckableKnowledgeRetriever = retriever
+    if current_settings.rag_reranker in {"hybrid_rrf", "cross_encoder"}:
         # 局部导入避免 hybrid 模块引用检索协议时形成模块初始化循环。
         from serviceops_agent.rag.hybrid import (  # noqa: PLC0415
             BM25CorpusRetriever,
@@ -292,8 +293,8 @@ def build_default_knowledge_retriever(
         lexical_retriever = BM25CorpusRetriever(
             chunks=chunker.split_documents(documents),
         )
-        # 返回完整双路召回器；它会保留每路原分数、排名和最终 RRF 分数。
-        return ReciprocalRankFusionRetriever(
+        # 第一阶段保留每路原分数、排名和最终 RRF 分数。
+        first_stage_retriever = ReciprocalRankFusionRetriever(
             dense_retriever=retriever,
             lexical_retriever=lexical_retriever,
             dense_k=current_settings.rag_hybrid_dense_k,
@@ -302,16 +303,39 @@ def build_default_knowledge_retriever(
             dense_weight=current_settings.rag_hybrid_dense_weight,
             lexical_weight=current_settings.rag_hybrid_lexical_weight,
         )
+        # 纯混合模式直接返回；Cross-Encoder 会继续联合编码固定候选池。
+        if current_settings.rag_reranker == "hybrid_rrf":
+            return first_stage_retriever
     # 局部导入避免reranking模块为类型协议反向导入本模块时形成初始化循环。
     from serviceops_agent.rag.reranking import (  # noqa: PLC0415
         BM25CandidateReranker,
+        CrossEncoderCandidateReranker,
         RerankingKnowledgeRetriever,
+        TEICrossEncoderScoringClient,
     )
+
+    if current_settings.rag_reranker == "cross_encoder":
+        # TEI 在独立进程加载模型，API 进程只发送固定候选文本并校验有限响应。
+        return RerankingKnowledgeRetriever(
+            retriever=first_stage_retriever,
+            reranker=CrossEncoderCandidateReranker(
+                scoring_client=TEICrossEncoderScoringClient(
+                    base_url=current_settings.rag_cross_encoder_url or "",
+                    api_key=(
+                        current_settings.rag_cross_encoder_api_key.get_secret_value()
+                        if current_settings.rag_cross_encoder_api_key is not None
+                        else None
+                    ),
+                    timeout_seconds=current_settings.rag_cross_encoder_timeout_seconds,
+                )
+            ),
+            candidate_k=current_settings.rag_rerank_candidate_k,
+        )
 
     # 返回第26步晋级的候选内重排装饰器。
     return RerankingKnowledgeRetriever(
         # 原Qdrant检索器负责召回和阈值过滤。
-        retriever=retriever,
+        retriever=first_stage_retriever,
         # BM25只占冻结权重，不覆盖全部向量语义分数。
         reranker=BM25CandidateReranker(
             lexical_weight=current_settings.rag_rerank_lexical_weight

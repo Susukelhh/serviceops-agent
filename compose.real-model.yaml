@@ -1,0 +1,38 @@
+# 在默认离线 Compose 之上显式启用真实模型；必须同时提供未提交的 .env.real-model。
+services:
+  agent-a:
+    env_file:
+      - path: .env.real-model
+        required: true
+    environment:
+      # 关闭匿名入口，真实模型演示只接受手动签发的短期 JWT，避免爬虫消耗额度。
+      SERVICEOPS_PUBLIC_DEMO_ENABLED: "false"
+      SERVICEOPS_LLM_BACKEND: openai_compatible
+      SERVICEOPS_AGENT_PLANNER_BACKEND: llm
+      SERVICEOPS_EMBEDDING_BACKEND: openai_compatible
+      SERVICEOPS_RAG_GENERATION_BACKEND: llm
+      # 与离线 hash Collection 物理隔离，防止向量维度或语义版本混用。
+      SERVICEOPS_QDRANT_COLLECTION: serviceops_knowledge_real_v1
+      # 收紧单实例并发，为面试演示提供清晰的费用上界和过载行为。
+      SERVICEOPS_AGENT_MAX_IN_FLIGHT_REQUESTS: 2
+
+  agent-b:
+    env_file:
+      - path: .env.real-model
+        required: true
+    environment:
+      SERVICEOPS_PUBLIC_DEMO_ENABLED: "false"
+      SERVICEOPS_LLM_BACKEND: openai_compatible
+      SERVICEOPS_AGENT_PLANNER_BACKEND: llm
+      SERVICEOPS_EMBEDDING_BACKEND: openai_compatible
+      SERVICEOPS_RAG_GENERATION_BACKEND: llm
+      SERVICEOPS_QDRANT_COLLECTION: serviceops_knowledge_real_v1
+      SERVICEOPS_AGENT_MAX_IN_FLIGHT_REQUESTS: 2
+
+  index-knowledge:
+    env_file:
+      - path: .env.real-model
+        required: true
+    environment:
+      SERVICEOPS_EMBEDDING_BACKEND: openai_compatible
+      SERVICEOPS_QDRANT_COLLECTION: serviceops_knowledge_real_v1

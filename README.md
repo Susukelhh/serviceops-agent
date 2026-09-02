@@ -10,11 +10,11 @@ flowchart LR
     USER["五种最小权限角色\nConsole / API"]
     EDGE["Nginx + FastAPI\n限流 / Schema / JWT"]
     GRAPH{"LangGraph\nState + 条件边"}
-    FAQ["FAQ\nQdrant + BM25 + RRF"]
+    FAQ["FAQ\nQdrant + BM25 + RRF\n可选 Cross-Encoder"]
     ORDER["订单 Agent\n规划 ↔ 工具观察"]
     RETURN["退货\ninterrupt + 人审"]
     PG[("PostgreSQL\nCheckpoint / 业务 / 审计")]
-    GOV["OTel + Eval + CI\n备份恢复"]
+    GOV["RAGAS + OTel/Langfuse\nFeedback + CI"]
 
     USER --> EDGE --> GRAPH
     GRAPH --> FAQ
@@ -31,7 +31,44 @@ flowchart LR
 [`docs/architecture.md`](docs/architecture.md)；90 秒面试画法见
 [`docs/architecture/interview-whiteboard.md`](docs/architecture/interview-whiteboard.md)。
 
-## 当前进度：第 34 步——端到端有据回答成功率盲测（首次结果 10/25，Gate FAIL）
+## v1.0 当前能力
+
+项目已完成多轮会话、SSE 生命周期流、RAG/工具/审批三类路径、持久化 Checkpoint、最小权限 JWT、
+审计哈希链、事务 Outbox、双实例故障切换、反馈问题池和离线发布门禁。RAG 默认采用全库向量 + BM25
+双路召回和 RRF，可选通过独立 Hugging Face TEI 服务执行 Cross-Encoder 二阶段重排。
+
+评测不是只报一个“正确率”：本项目同时保留检索排序、负例拒答、引用合法性、Agent 工具轨迹、审批
+安全、幂等恢复和端到端有据回答门禁，并增加 RAGAS 0.4 标准 ID Context Precision/Recall 适配层。
+RAGAS 当前是互补报告而非唯一发布门，因为通用 RAG 指标无法证明订单未越权、写操作经过审批、重试
+没有重复提交，或域外问题确实拒答。
+
+运行期可观测复用 OpenTelemetry。默认只在本地输出或发送到 Collector；可选 `langfuse_otlp` 直连
+Langfuse v4，但只发送有限 Span 属性，不上传用户问题、模型答案、身份、订单号或密钥。用户点踩和
+自动转人工会进入持久化问题池，经独立知识审核角色归因后才能导出为草稿，不能直接污染在线知识库。
+
+### 与 MewHelp 的定位差异
+
+| 维度 | ServiceOps Agent v1.0 | 仍落后或尚未验证的部分 |
+|---|---|---|
+| 业务安全 | 服务端身份绑定、RBAC、审批中断、幂等、Outbox、审计链 | MewHelp 展示的九类意图/五个出口更丰富；本项目业务面较窄 |
+| RAG | Qdrant + BM25 + RRF、可选 Cross-Encoder、正负例与盲测纪律 | 还没有标题/表格感知切分；Cross-Encoder 只有适配和测试，尚无真实模型晋级结果 |
+| 多轮交互 | 结构化摘要、指代消解、断点恢复、SSE 事件流 | 当前不是逐 Token 生成流；缺订单时的用户选择器不如 MewHelp 产品化 |
+| 可观测与飞轮 | OTel/Langfuse、安全日志、反馈审核、知识草稿导出 | 反馈台尚未做成完整运营 UI，也未保存可重放的完整检索快照和频次聚合 |
+| 工具生态 | 受控 LangChain Tool、规划循环和人工审批 | 尚未实现 MewHelp 描述的 MCP/Skill 外部工具生态与 RoBERTa 分类微调 |
+| 生产工程 | PostgreSQL、多副本、迁移、限流、备份恢复、CI 发布门 | 仍是本机/作品级验证，没有真实流量、生产 SLA、云 HA 或长期线上 A/B 数据 |
+
+MewHelp 页面给出的 Recall@5 0.983 是其语料和口径下的结果，不能直接与本项目不同数据集的数字横比。
+本项目选择把“失败结果、首次盲测和适用边界”一并保留，避免只展示最优实验。
+
+实现与决策记录：
+
+- [反馈问题池与知识候选飞轮](docs/steps/60-feedback-data-flywheel.md)
+- [SSE 与受控真实模型演示](docs/steps/61-sse-and-controlled-real-model-demo.md)
+- [RAGAS 标准适配层](docs/steps/62-ragas-adapter.md)
+- [Cross-Encoder 二阶段重排](docs/steps/63-cross-encoder-second-stage-reranking.md)
+- [Langfuse 隐私安全 OTLP](docs/steps/64-langfuse-privacy-safe-otel.md)
+
+## 演进与实验记录
 
 项目默认使用确定性关键词分类器，保证没有模型密钥也能运行；同时已经提供可切换的
 OpenAI 兼容模型通道，用 Pydantic 约束模型只能返回意图、置信度和简短原因。
@@ -256,6 +293,13 @@ uv run python examples/04_grounded_faq_rag.py
 
 ```powershell
 uv run python examples/05_rag_evaluation.py
+```
+
+运行同一检索器上的 RAGAS 0.4 标准 ID 指标（只安装离线评测依赖）：
+
+```powershell
+uv sync --group eval
+uv run --group eval python examples/62_ragas_retrieval_adapter.py
 ```
 
 运行第 24 步 RAG v2 困难 Baseline，查看旧方案的排序与误召回问题（完全离线）：
@@ -627,12 +671,23 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/audit/approvals/$($start.th
 ## 运行质量检查
 
 ```powershell
+uv sync --all-groups
 uv run ruff check .
 uv run mypy src
 uv run pytest
+uv run python examples/30_release_readiness_audit.py --run-quality-gates
 ```
 
 ## 可选：接入真实模型
+
+推荐使用隔离的 Compose 覆盖档。它会关闭匿名入口、把单实例模型并发收紧到 2，并把真实 Embedding
+写入独立 Collection：
+
+```powershell
+Copy-Item .env.real-model.example .env.real-model
+# 只在 .env.real-model 中填写密钥与模型地址
+docker compose -f compose.yaml -f compose.real-model.yaml up --build --detach --wait
+```
 
 复制 `.env.example` 为 `.env`，然后只在本机填写所选模型服务商提供的配置：
 
@@ -687,6 +742,23 @@ SERVICEOPS_AGENT_MAX_TOOL_STEPS=3
 模型只建议动作、工具名和订单号；`user_id`、工具白名单、执行预算和重复调用判断全部由服务端
 代码控制。真实模型规划会增加调用次数和费用，学习及测试建议继续使用默认 `deterministic`。
 
+Cross-Encoder 候选模式需要独立 TEI `/rerank` 服务，默认不会下载或加载 GB 级模型：
+
+```dotenv
+SERVICEOPS_RAG_RERANKER=cross_encoder
+SERVICEOPS_RAG_CROSS_ENCODER_URL=http://127.0.0.1:8081
+SERVICEOPS_RAG_RERANK_CANDIDATE_K=5
+```
+
+把安全 Trace 发送到 Langfuse：
+
+```powershell
+Copy-Item .env.langfuse.example .env.langfuse
+docker compose -f compose.yaml -f compose.langfuse.yaml up --build --detach --wait
+```
+
+两个候选能力默认都不晋级线上配置；必须先在项目困难集上验证质量、延迟、故障率和隐私边界。
+
 本地模拟订单：
 
 | 用户 | 可以查询 | 预期结果 |
@@ -708,13 +780,13 @@ src/serviceops_agent/
 ├── domain/    # 与框架无关的业务枚举与领域模型
 ├── evaluation/# RAG/整图评测、候选重复实验与晋级质量门
 ├── graph/     # LangGraph 状态、节点、路由和图装配
-├── infrastructure/ # 订单、退货、Outbox 与内存/SQLite/PostgreSQL 审计仓库
+├── infrastructure/ # 订单、会话、反馈、Outbox 与多后端仓库
 ├── migrations/ # Alembic 业务表结构版本链
 ├── observability/ # OpenTelemetry Trace/Metrics 与关联 JSON 日志
 ├── operations/ # PostgreSQL 备份、隔离恢复和其他显式运维能力
 ├── security/  # JWT Claims、签发/验证和角色—Scope策略
 ├── tools/     # 身份绑定的只读/写入 LangChain Tools
-├── rag/       # 切片、Embedding、独立 Qdrant、BM25、RRF 和受约束生成
+├── rag/       # 切片、Embedding、Qdrant、BM25/RRF、Cross-Encoder 和受约束生成
 └── web/       # 随 wheel 发布的 Agent 控制台 HTML/CSS/JavaScript
 Dockerfile     # 多阶段、固定依赖、非 root 单进程运行镜像
 compose.yaml   # Nginx + 双Agent + 一次性迁移/建索引 + PostgreSQL + 独立Qdrant
@@ -748,7 +820,7 @@ uv run python examples/33_public_demo_end_to_end_blind_test.py
 
 本项目的详细代码注释规则见 [`docs/code-commenting-convention.md`](docs/code-commenting-convention.md)。
 
-## 下一步
+## 历史实验结论与后续记录（保留）
 
 第37步通过私有诊断确认第36步自动低分主要来自机械匹配、金标范围和最终状态口径，而真正系统错误是范围门
 把安全咨询误判为索取凭据。第38步因此保持Prompt v2、Embedding、切片与混合召回参数不变，只冻结范围门

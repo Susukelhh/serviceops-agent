@@ -11,7 +11,7 @@ from uuid import UUID
 
 # BaseModel 提供解析和序列化；JsonValue 约束调试值只能是安全 JSON；
 # ConfigDict 禁止额外身份字段；StrictBool 防止字符串真值。
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, model_validator
 
 # ApprovalAuditEvent 是只对 audit:read 主体公开的最小化审批证据记录。
 from serviceops_agent.domain.audit import ApprovalAuditEvent
@@ -25,6 +25,16 @@ from serviceops_agent.domain.conversation import (
 
 # Intent 是有限业务枚举，ChatResponse 会把它安全地序列化为 JSON 字符串。
 from serviceops_agent.domain.enums import Intent
+
+# 反馈API复用有限信号、原因、分类和知识候选领域类型。
+from serviceops_agent.domain.feedback import (
+    FeedbackCategory,
+    FeedbackReason,
+    FeedbackRecord,
+    FeedbackSignal,
+    FeedbackStatus,
+    KnowledgeCandidate,
+)
 
 # Citation 是 RAG 路径允许对外暴露的脱敏知识来源，不包含完整向量或内部 payload。
 from serviceops_agent.domain.knowledge import Citation
@@ -64,8 +74,14 @@ class ReadinessResponse(BaseModel):
     checks: dict[str, DependencyCheck]
     # persistence_backend 帮助确认实际检查的是内存、SQLite 还是 PostgreSQL 资源。
     persistence_backend: Literal["memory", "sqlite", "postgres"]
-    # telemetry_exporter 展示 none/console/otlp_http 配置，不包含 Collector 端点或 Header。
-    telemetry_exporter: Literal["disabled", "none", "console", "otlp_http"]
+    # 只展示有限导出模式，不包含 Collector/Langfuse 端点或鉴权 Header。
+    telemetry_exporter: Literal[
+        "disabled",
+        "none",
+        "console",
+        "otlp_http",
+        "langfuse_otlp",
+    ]
 
 
 class ChatRequest(BaseModel):
@@ -373,3 +389,69 @@ class ConversationMessageResponse(ChatResponse):
     turn_id: UUID
     sequence_number: int = Field(ge=1)
     replayed: bool
+
+
+class FeedbackCreateRequest(BaseModel):
+    """普通用户为自己的一轮会话提交的结构化反馈。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+    )
+    signal: Literal[FeedbackSignal.HELPFUL, FeedbackSignal.UNHELPFUL]
+    reason: FeedbackReason | None = None
+
+    @model_validator(mode="after")
+    def validate_reason(self) -> "FeedbackCreateRequest":
+        """正向反馈无需失败原因，负向反馈必须给出稳定原因码。"""
+
+        if self.signal == FeedbackSignal.HELPFUL and self.reason is not None:
+            raise ValueError("正向反馈不能包含失败原因")
+        if self.signal == FeedbackSignal.UNHELPFUL and self.reason is None:
+            raise ValueError("负向反馈必须选择原因")
+        return self
+
+
+class FeedbackCreateResponse(BaseModel):
+    """反馈写入后的低敏幂等结果。"""
+
+    feedback_id: UUID
+    signal: FeedbackSignal
+    status: FeedbackStatus
+    replayed: bool
+
+
+class FeedbackQueueResponse(BaseModel):
+    """知识审核员读取的有限问题池。"""
+
+    items: list[FeedbackRecord]
+
+
+class FeedbackReviewRequest(BaseModel):
+    """审核员对一条失败反馈做出的结构化归因。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: FeedbackCategory
+    proposed_title: str | None = Field(default=None, min_length=3, max_length=200)
+    proposed_answer: str | None = Field(default=None, min_length=10, max_length=4000)
+
+    @model_validator(mode="after")
+    def validate_candidate_payload(self) -> "FeedbackReviewRequest":
+        """只有知识缺口审核可以并且必须携带候选知识正文。"""
+
+        if self.category == FeedbackCategory.KNOWLEDGE_GAP:
+            if self.proposed_title is None or self.proposed_answer is None:
+                raise ValueError("知识缺口审核必须提供标题和候选答案")
+        elif self.proposed_title is not None or self.proposed_answer is not None:
+            raise ValueError("非知识缺口审核不能携带候选知识")
+        return self
+
+
+class KnowledgeCandidateQueueResponse(BaseModel):
+    """已经人工确认、等待离线评测和版本发布的知识候选。"""
+
+    candidates: list[KnowledgeCandidate]

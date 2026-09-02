@@ -101,7 +101,7 @@ class RetrievalHit(BaseModel):
     # retrieval_channels 明确说明这条证据由哪几条召回通道找到，便于页面解释和离线评测。
     retrieval_channels: list[Literal["dense", "lexical"]] = Field(default_factory=list)
     # fusion_method 区分纯向量、旧候选内重排和完整 RRF 混合召回，避免把不同分数直接比较。
-    fusion_method: Literal["dense", "candidate_bm25", "rrf"] | None = None
+    fusion_method: Literal["dense", "candidate_bm25", "rrf", "cross_encoder"] | None = None
 
 
 class Citation(BaseModel):

@@ -7,6 +7,8 @@ __pycache__/
 .venv/
 .venv-py313-backup/
 .env
+.env.real-model
+.env.langfuse
 
 # 测试、类型检查和代码质量工具的缓存
 .pytest_cache/

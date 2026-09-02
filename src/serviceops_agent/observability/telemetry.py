@@ -78,9 +78,9 @@ from serviceops_agent.config.settings import Settings
 from serviceops_agent.graph.state import ServiceState
 
 # 模块级代理在 Provider 配置前也可以安全创建；配置后会自动委托给真实 SDK。
-tracer = trace.get_tracer("serviceops_agent", "0.1.0")
+tracer = trace.get_tracer("serviceops_agent", "1.0.0")
 # Meter 使用稳定 instrumentation scope，便于后端按库版本聚合。
-meter = metrics.get_meter("serviceops_agent", "0.1.0")
+meter = metrics.get_meter("serviceops_agent", "1.0.0")
 
 # 节点耗时直方图只使用有限 node/outcome 属性。
 graph_node_duration = meter.create_histogram(
@@ -324,6 +324,25 @@ def _configure_json_logging(settings: Settings) -> None:
     project_logger.addHandler(handler)
 
 
+def _parse_otlp_headers(raw_headers: str | None) -> dict[str, str]:
+    """解析逗号分隔的 OTLP Header，拒绝歧义键且不在错误中回显值。"""
+
+    if raw_headers is None or not raw_headers.strip():
+        return {}
+    parsed: dict[str, str] = {}
+    for raw_item in raw_headers.split(","):
+        key, separator, value = raw_item.strip().partition("=")
+        if (
+            separator != "="
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+", key)
+            or not value.strip()
+            or key.lower() in {existing.lower() for existing in parsed}
+        ):
+            raise ValueError("OTLP Header 配置格式无效")
+        parsed[key] = value.strip()
+    return parsed
+
+
 def _build_exporters(settings: Settings) -> tuple[SpanExporter | None, MetricExporter | None]:
     """根据有限配置创建成对 Trace/Metrics Exporter。"""
 
@@ -333,12 +352,27 @@ def _build_exporters(settings: Settings) -> tuple[SpanExporter | None, MetricExp
     # console 用于本地学习，不需要 Collector。
     if settings.telemetry_exporter == "console":
         return ConsoleSpanExporter(), ConsoleMetricExporter()
-    # Settings 已把剩余值限制为 otlp_http；统一去掉末尾斜杠避免双斜杠。
+    # SecretStr 只在构造 Exporter 的最小范围内解包，不写日志或健康接口。
+    headers = _parse_otlp_headers(
+        settings.otel_otlp_headers.get_secret_value()
+        if settings.otel_otlp_headers is not None
+        else None
+    )
+    # 统一去掉末尾斜杠避免双斜杠。
     endpoint_root = settings.otel_otlp_endpoint.rstrip("/")
+    # Langfuse v4 接收标准 OTLP Trace；它不是本项目的业务 Metrics 后端。
+    if settings.telemetry_exporter == "langfuse_otlp":
+        return (
+            OTLPSpanExporter(
+                endpoint=f"{endpoint_root}/v1/traces",
+                headers=headers,
+            ),
+            None,
+        )
     # OTLP/HTTP 的 Trace 与 Metrics 使用不同标准路径。
     return (
-        OTLPSpanExporter(endpoint=f"{endpoint_root}/v1/traces"),
-        OTLPMetricExporter(endpoint=f"{endpoint_root}/v1/metrics"),
+        OTLPSpanExporter(endpoint=f"{endpoint_root}/v1/traces", headers=headers),
+        OTLPMetricExporter(endpoint=f"{endpoint_root}/v1/metrics", headers=headers),
     )
 
 
@@ -348,7 +382,7 @@ def _build_telemetry_resource(settings: Settings) -> Resource:
     return Resource.create(
         {
             "service.name": settings.otel_service_name,
-            "service.version": "0.1.0",
+            "service.version": "1.0.0",
             "service.instance.id": settings.instance_id,
             "deployment.environment.name": settings.environment,
         }
@@ -453,9 +487,12 @@ def start_safe_span(
     """创建不自动记录异常正文的当前 Span。"""
 
     # record_exception=False 防止第三方异常 message/stacktrace 自动进入遥测后端。
+    safe_attributes = _safe_span_attributes(attributes)
+    # Langfuse 的 OTel 映射只需要观测类型；刻意不发送 input/output/user.id/session.id。
+    safe_attributes.setdefault("langfuse.observation.type", "span")
     with tracer.start_as_current_span(
         name,
-        attributes=_safe_span_attributes(attributes),
+        attributes=safe_attributes,
         record_exception=False,
         set_status_on_exception=False,
     ) as span:

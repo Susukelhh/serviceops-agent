@@ -55,12 +55,19 @@ class Settings(BaseSettings):
 
     # telemetry_enabled 统一控制 Trace、Metrics 与关联 JSON 日志；测试会明确关闭它。
     telemetry_enabled: bool = True
-    # console 适合本地学习；otlp_http 发送到 Collector；none 保留 API 但不导出数据。
-    telemetry_exporter: Literal["none", "console", "otlp_http"] = "console"
+    # langfuse_otlp 只发送安全 Trace；业务指标仍应经 Collector 进入 Prometheus。
+    telemetry_exporter: Literal[
+        "none",
+        "console",
+        "otlp_http",
+        "langfuse_otlp",
+    ] = "console"
     # OpenTelemetry Resource 中的稳定服务名，不能使用每次请求变化的值。
     otel_service_name: str = "serviceops-agent"
     # OTLP/HTTP Collector 根地址；代码会分别追加 /v1/traces 与 /v1/metrics。
     otel_otlp_endpoint: str = "http://127.0.0.1:4318"
+    # 可选 OTLP Header 使用 SecretStr；Langfuse 需要 Basic Authorization 与协议版本。
+    otel_otlp_headers: SecretStr | None = None
     # Trace 采样比例；开发默认全采样，生产应根据流量、成本和风险调整。
     otel_trace_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
     # Metrics 周期导出间隔；过短会增加 Collector 和应用负担。
@@ -186,12 +193,18 @@ class Settings(BaseSettings):
         "deterministic_v1",
         "deterministic_v2",
     ] = "deterministic_v1"
-    # 检索模式：off为纯向量，bm25为旧候选内重排，hybrid_rrf为完整双路召回。
-    rag_reranker: Literal["off", "bm25", "hybrid_rrf"] = "hybrid_rrf"
+    # cross_encoder 在完整双路候选之上调用独立 TEI 服务做二阶段联合编码重排。
+    rag_reranker: Literal["off", "bm25", "hybrid_rrf", "cross_encoder"] = "hybrid_rrf"
     # BM25词面分数在“向量 + 词面”融合分数中的占比，需要由排序实验选择。
     rag_rerank_lexical_weight: float = Field(default=0.25, ge=0.0, le=1.0)
     # 重排前固定召回的候选切片数，必须不少于最终rag_top_k才有纠错空间。
     rag_rerank_candidate_k: int = Field(default=5, ge=1, le=20)
+    # cross_encoder 调用独立 TEI /rerank 服务，避免在 API 进程加载 GB 级模型。
+    rag_cross_encoder_url: str | None = None
+    # 受保护 TEI 服务可使用 Bearer Key；本地私网无鉴权时保持 None。
+    rag_cross_encoder_api_key: SecretStr | None = None
+    # 重排服务失败应尽快触发安全降级，不能无限占用 Agent 工位。
+    rag_cross_encoder_timeout_seconds: float = Field(default=5.0, gt=0.0, le=30.0)
     # 完整混合召回中，Qdrant 向量通道独立从全库取回的候选数量。
     rag_hybrid_dense_k: int = Field(default=8, ge=1, le=50)
     # 完整混合召回中，BM25 关键词通道独立从全库取回的候选数量。
@@ -228,6 +241,18 @@ class Settings(BaseSettings):
         if self.rag_reranker == "bm25" and self.rag_rerank_candidate_k < self.rag_top_k:
             # 错误只描述字段关系，不包含查询或知识内容。
             raise ValueError("RAG 重排候选数不能小于最终 Top-K")
+        if self.rag_reranker == "cross_encoder":
+            if self.rag_rerank_candidate_k < self.rag_top_k:
+                raise ValueError("Cross-Encoder 候选数不能小于最终 Top-K")
+            if self.rag_cross_encoder_url is None or not self.rag_cross_encoder_url.startswith(
+                ("http://", "https://")
+            ):
+                raise ValueError("Cross-Encoder 必须配置 HTTP(S) TEI 服务地址")
+            if (
+                self.rag_hybrid_dense_k < self.rag_rerank_candidate_k
+                or self.rag_hybrid_lexical_k < self.rag_rerank_candidate_k
+            ):
+                raise ValueError("Cross-Encoder 两路召回数不能小于重排候选数")
         # 完整混合召回的两条通道都应至少能独立提供最终 Top-K 数量。
         if self.rag_reranker == "hybrid_rrf" and (
             self.rag_hybrid_dense_k < self.rag_top_k
@@ -264,6 +289,16 @@ class Settings(BaseSettings):
         ):
             # 生产应显式选择 OTLP Collector 或 none，避免高流量控制台输出。
             raise ValueError("生产环境遥测导出器不能使用 console")
+        if self.telemetry_exporter in {"otlp_http", "langfuse_otlp"} and not (
+            self.otel_otlp_endpoint.startswith("http://")
+            or self.otel_otlp_endpoint.startswith("https://")
+        ):
+            raise ValueError("OTLP 导出地址必须使用 HTTP(S)")
+        if self.telemetry_exporter == "langfuse_otlp" and (
+            self.otel_otlp_headers is None
+            or not self.otel_otlp_headers.get_secret_value().strip()
+        ):
+            raise ValueError("Langfuse OTLP 必须配置鉴权 Header")
         # 匿名公网入口如果直接连接真实模型，爬虫或恶意请求可能快速消耗账户余额。
         if (
             self.public_demo_enabled

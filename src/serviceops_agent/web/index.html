@@ -187,14 +187,14 @@
             <div id="citation-list" class="citation-list"></div>
           </section>
 
-          <!-- composer 只提交 message 和可选幂等键，身份永远不放请求体。 -->
+          <!-- composer 通过多轮会话 SSE 提交 message 和幂等键，身份永远不放请求体。 -->
           <form id="chat-form" class="composer">
             <label class="visually-hidden" for="message-input">输入售后问题</label>
             <textarea id="message-input" rows="3" maxlength="4000" placeholder="例如：查询订单 SO100001 到哪了" required></textarea>
             <div class="composer-footer">
               <div class="idempotency-field">
-                <label for="idempotency-input">写操作幂等键</label>
-                <input id="idempotency-input" type="text" maxlength="128" placeholder="退货演示时自动生成">
+                <label for="idempotency-input">本轮幂等键</label>
+                <input id="idempotency-input" type="text" maxlength="128" placeholder="留空时自动生成">
               </div>
               <button id="send-button" class="send-button" type="submit">
                 <span>运行 Agent</span><span aria-hidden="true">↗</span>

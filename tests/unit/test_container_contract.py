@@ -144,6 +144,49 @@ def test_nginx_gateway_round_robins_and_re_resolves_agent_instances() -> None:
     assert "X-ServiceOps-Gateway nginx" in nginx
 
 
+def test_sse_gateway_disables_buffering_and_automatic_upstream_replay() -> None:
+    """流式写请求必须逐事件转发，连接中断后由客户端幂等重试。"""
+
+    nginx = _load_text("deploy/nginx/nginx.conf")
+    stream_location = nginx.split(
+        "location ~ ^/api/v1/conversations/[0-9a-fA-F-]+/messages/stream$ {",
+        maxsplit=1,
+    )[1].split("}", maxsplit=1)[0]
+    assert "proxy_buffering off" in stream_location
+    assert "proxy_cache off" in stream_location
+    assert "proxy_next_upstream off" in stream_location
+    assert "X-Accel-Buffering no" in stream_location
+
+
+def test_real_model_compose_is_explicit_local_and_secret_file_backed() -> None:
+    """真实模型档应与默认离线档隔离，且不能提交真实密钥。"""
+
+    override = _load_text("compose.real-model.yaml")
+    example = _load_text(".env.real-model.example")
+    assert "SERVICEOPS_PUBLIC_DEMO_ENABLED: \"false\"" in override
+    assert "SERVICEOPS_LLM_BACKEND: openai_compatible" in override
+    assert "SERVICEOPS_AGENT_PLANNER_BACKEND: llm" in override
+    assert "SERVICEOPS_RAG_GENERATION_BACKEND: llm" in override
+    assert "serviceops_knowledge_real_v1" in override
+    assert "path: .env.real-model" in override
+    assert "replace-with-your-api-key" in example
+    assert "sk-" not in example
+
+
+def test_langfuse_compose_uses_uncommitted_secret_file_and_trace_only_exporter() -> None:
+    """Langfuse 档必须显式开启安全 OTLP，且示例不能包含真实凭据。"""
+
+    override = _load_text("compose.langfuse.yaml")
+    example = _load_text(".env.langfuse.example")
+    gitignore = _load_text(".gitignore")
+    assert "path: .env.langfuse" in override
+    assert "SERVICEOPS_TELEMETRY_EXPORTER: langfuse_otlp" in override
+    assert ".env.langfuse" in gitignore
+    assert "/api/public/otel" in example
+    assert "replace-with-base64" in example
+    assert "sk-lf-" not in example
+
+
 def test_nginx_limits_only_business_rate_and_returns_explicit_429_json() -> None:
     """入口应保护 /api/，同时让健康检查和 Swagger 保持在限流区之外。"""
 

@@ -1,12 +1,13 @@
 [project]
 name = "serviceops-agent"
-version = "0.1.0"
+version = "1.0.0"
 description = "面向企业售后工单场景的可控、可评测 AI Agent"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "alembic>=1.19,<1.20",
     "fastapi>=0.116,<1.0",
+    "httpx>=0.28,<1.0",
     "langchain[openai]>=1.2,<2.0",
     "langgraph>=1.0,<2.0",
     "langgraph-checkpoint-postgres>=3.0,<4.0",
@@ -25,11 +26,16 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28,<1.0",
     "mypy>=1.17,<2.0",
     "pytest>=8.4,<10.0",
     "pytest-asyncio>=1.1,<2.0",
     "ruff>=0.12,<1.0",
+]
+eval = [
+    # RAGAS 只进入离线评测环境，不增加 API 镜像体积或线上依赖面。
+    "ragas>=0.4.3,<0.5",
+    # RAGAS 0.4.3 仍导入 0.3 系列 VertexAI 兼容模块；0.4 已移除该路径。
+    "langchain-community>=0.3.31,<0.4",
 ]
 
 [build-system]

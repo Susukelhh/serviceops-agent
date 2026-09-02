@@ -5,13 +5,156 @@ import re
 
 # Counter统计候选切片词频；log计算BM25逆文档频率。
 from collections import Counter
-from math import log
+from math import isfinite, log
+from typing import Protocol
+
+import httpx
+from pydantic import BaseModel, Field, TypeAdapter
 
 # RetrievalHit保存重排后的同一证据切片和融合分数。
 from serviceops_agent.domain.knowledge import RetrievalHit
 
 # KnowledgeRetriever协议允许包装Qdrant或测试替身。
 from serviceops_agent.rag.retriever import KnowledgeRetriever
+
+
+class CandidateReranker(Protocol):
+    """候选闭包内重排器的最小协议。"""
+
+    def rerank(
+        self,
+        *,
+        query: str,
+        hits: list[RetrievalHit],
+        top_k: int,
+    ) -> list[RetrievalHit]:
+        """只改变传入候选顺序和排序分数。"""
+
+
+class CrossEncoderScoringClient(Protocol):
+    """把查询与候选文本联合编码并返回原顺序相关性分数。"""
+
+    def score(self, *, query: str, documents: list[str]) -> list[float]:
+        """返回与 documents 等长、位于 0 到 1 的分数。"""
+
+
+class CrossEncoderServiceError(RuntimeError):
+    """外部重排服务不可用或响应不满足闭包契约。"""
+
+
+class _TEIRank(BaseModel):
+    """Hugging Face TEI /rerank 的单条有限响应。"""
+
+    index: int = Field(ge=0)
+    score: float = Field(ge=0.0, le=1.0)
+
+
+class TEICrossEncoderScoringClient:
+    """调用独立 Hugging Face Text Embeddings Inference Cross-Encoder。"""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None = None,
+        timeout_seconds: float = 5.0,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        if not base_url.startswith(("http://", "https://")):
+            raise ValueError("TEI base_url 必须使用 http:// 或 https://")
+        if timeout_seconds <= 0.0:
+            raise ValueError("TEI timeout_seconds 必须大于 0")
+        normalized = base_url.rstrip("/")
+        self._url = normalized if normalized.endswith("/rerank") else f"{normalized}/rerank"
+        self._api_key = api_key
+        self._timeout_seconds = timeout_seconds
+        self._transport = transport
+
+    def score(self, *, query: str, documents: list[str]) -> list[float]:
+        """请求归一化分数，并按输入索引恢复原候选顺序。"""
+
+        if not documents:
+            return []
+        headers = {"Accept": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+        try:
+            with httpx.Client(
+                timeout=self._timeout_seconds,
+                follow_redirects=False,
+                transport=self._transport,
+            ) as client:
+                response = client.post(
+                    self._url,
+                    headers=headers,
+                    json={
+                        "query": query,
+                        "texts": documents,
+                        "raw_scores": False,
+                        "return_text": False,
+                    },
+                )
+                response.raise_for_status()
+                payload = response.json()
+            raw_ranks = payload.get("ranks") if isinstance(payload, dict) else payload
+            ranks = TypeAdapter(list[_TEIRank]).validate_python(raw_ranks)
+            scores: list[float | None] = [None] * len(documents)
+            for rank in ranks:
+                if rank.index >= len(documents) or scores[rank.index] is not None:
+                    raise ValueError("TEI 返回重复或越界候选索引")
+                scores[rank.index] = rank.score
+            if any(score is None for score in scores):
+                raise ValueError("TEI 返回候选数量不完整")
+            return [float(score) for score in scores if score is not None]
+        except Exception as error:
+            # 不传播第三方响应正文、URL 查询参数或鉴权信息。
+            raise CrossEncoderServiceError("Cross-Encoder 重排服务暂不可用") from error
+
+
+class CrossEncoderCandidateReranker:
+    """用联合编码相关性重排第一阶段候选，但不创建或补召回证据。"""
+
+    def __init__(self, *, scoring_client: CrossEncoderScoringClient) -> None:
+        self._scoring_client = scoring_client
+
+    def rerank(
+        self,
+        *,
+        query: str,
+        hits: list[RetrievalHit],
+        top_k: int,
+    ) -> list[RetrievalHit]:
+        """批量评分全部候选，稳定按相关性降序返回。"""
+
+        if top_k < 1:
+            raise ValueError("top_k 必须大于等于 1")
+        if not hits:
+            return []
+        scores = self._scoring_client.score(
+            query=query,
+            documents=[f"{hit.chunk.title}\n{hit.chunk.content}" for hit in hits],
+        )
+        if len(scores) != len(hits) or any(
+            not isfinite(score) or not 0.0 <= score <= 1.0 for score in scores
+        ):
+            raise CrossEncoderServiceError("Cross-Encoder 返回了非法相关性分数")
+        ranked = sorted(
+            enumerate(zip(hits, scores, strict=True)),
+            key=lambda item: (-item[1][1], item[0]),
+        )
+        return [
+            RetrievalHit(
+                chunk=hit.chunk,
+                score=score,
+                dense_score=hit.dense_score,
+                lexical_score=hit.lexical_score,
+                dense_rank=hit.dense_rank,
+                lexical_rank=hit.lexical_rank,
+                retrieval_channels=hit.retrieval_channels,
+                fusion_method="cross_encoder",
+            )
+            for _, (hit, score) in ranked[:top_k]
+        ]
 
 
 class ChineseLexicalTokenizer:
@@ -215,7 +358,7 @@ class RerankingKnowledgeRetriever:
         self,
         *,
         retriever: KnowledgeRetriever,
-        reranker: BM25CandidateReranker,
+        reranker: CandidateReranker,
         candidate_k: int,
     ) -> None:
         """保存底层检索器、重排器和固定候选池大小。"""

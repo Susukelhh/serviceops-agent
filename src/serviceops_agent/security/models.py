@@ -21,6 +21,8 @@ class Role(StrEnum):
     # DEVELOPER 代表本地开发调试人员，只能读取已经脱敏的 LangGraph 教学轨迹。
     # 该角色不拥有普通用户查询、退货审批、审计链读取或运维补偿权限。
     DEVELOPER = "developer"
+    # KNOWLEDGE_CURATOR 可以读取反馈问题池并做知识归因，但不能发起业务写操作。
+    KNOWLEDGE_CURATOR = "knowledge_curator"
     # PUBLIC_DEMO 是服务端短时签发的沙盒访客，只能操作属于自己会话的演示线程。
     PUBLIC_DEMO = "public_demo"
 
@@ -42,6 +44,8 @@ class PermissionScope(StrEnum):
     WORKFLOW_RECOVERY = "operations:workflow-recovery"
     # DEBUG_READ 只允许在 development/test 环境读取脱敏后的状态与 Checkpoint 历史。
     DEBUG_READ = "debug:read"
+    # FEEDBACK_REVIEW 允许读取失败问题池、提交归因并导出待评测知识候选。
+    FEEDBACK_REVIEW = "feedback:review"
 
 
 # 角色到最大允许 Scope 的服务端策略，不信任 Token 自己声称的任意角色—权限组合。
@@ -62,6 +66,8 @@ ROLE_SCOPE_POLICY: dict[Role, frozenset[PermissionScope]] = {
     ),
     # 开发调试人员只能读取教学轨迹；生产环境路由还会执行第二道关闭检查。
     Role.DEVELOPER: frozenset({PermissionScope.DEBUG_READ}),
+    # 知识审核员只管理脱敏反馈闭环，不继承用户、审批、审计或运维权限。
+    Role.KNOWLEDGE_CURATOR: frozenset({PermissionScope.FEEDBACK_REVIEW}),
     # 公网访客可完整体验对话、审批、审计与教学回放；各读取路由还会校验线程归属。
     Role.PUBLIC_DEMO: frozenset(
         {

@@ -21,7 +21,7 @@ from serviceops_agent.security.models import Role
 
 
 def main() -> None:
-    """生成普通用户、审批人、审计员、运维员和开发者五枚隔离 Token。"""
+    """生成普通用户、审批人、审计员、运维员、开发者和知识审核员Token。"""
 
     # 读取缓存配置，但绝不打印 SecretStr 明文。
     settings = get_settings()
@@ -71,6 +71,12 @@ def main() -> None:
         # DEVELOPER 根据服务端策略只获得 debug:read。
         roles={Role.DEVELOPER},
     )
+    # 知识审核员只读取反馈问题池并形成待评测候选，不拥有普通业务权限。
+    curator_token = create_access_token(
+        settings=settings,
+        subject="curator-001",
+        roles={Role.KNOWLEDGE_CURATOR},
+    )
 
     # 根据配置计算近似过期时间；真正校验仍以 Token exp 为准。
     expires_at = datetime.now(UTC) + timedelta(minutes=settings.jwt_access_token_minutes)
@@ -100,6 +106,10 @@ def main() -> None:
     # 调试 Token 只能在 development/test 环境读取脱敏状态历史。
     print("=== 开发者 Token（sub=developer-001，scope=debug:read）===")
     print(developer_token)
+    # 空行分隔开发者和知识审核员Token。
+    print()
+    print("=== 知识审核员 Token（sub=curator-001，scope=feedback:review）===")
+    print(curator_token)
     # 输出预计失效时间，提醒开发者不要长期保存演示 Token。
     print()
     print(f"预计 UTC 过期时间：{expires_at.isoformat()}")

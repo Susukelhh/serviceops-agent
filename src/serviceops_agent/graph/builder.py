@@ -194,7 +194,11 @@ def build_service_graph(
         (
             "graph:faq_candidates_fused_rrf"
             if current_settings.rag_reranker == "hybrid_rrf"
-            else "graph:faq_candidates_reranked_bm25"
+            else (
+                "graph:faq_candidates_reranked_cross_encoder"
+                if current_settings.rag_reranker == "cross_encoder"
+                else "graph:faq_candidates_reranked_bm25"
+            )
         )
         # 只有工厂内部真实装配重排/融合时，才自动公开对应事件。
         if knowledge_retriever is None and current_settings.rag_reranker != "off"

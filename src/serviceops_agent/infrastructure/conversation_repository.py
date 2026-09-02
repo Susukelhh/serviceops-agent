@@ -97,6 +97,15 @@ class ConversationRepository(Protocol):
     ) -> list[ConversationTurnRecord]:
         """按时间正序返回最近的有限轮次。"""
 
+    def get_turn_for_owner(
+        self,
+        *,
+        conversation_id: UUID,
+        turn_id: UUID,
+        owner_user_id: str,
+    ) -> ConversationTurnRecord | None:
+        """只向会话所有者返回指定轮次；不存在和越权使用同一空结果。"""
+
     def get_turn_by_workflow_thread(
         self,
         *,
@@ -474,6 +483,25 @@ class InMemoryConversationRepository:
                 raise ConversationUnavailableError
             turn_ids = self._turn_ids_by_conversation[conversation_id][-limit:]
             return [self._turns[turn_id] for turn_id in turn_ids]
+
+    def get_turn_for_owner(
+        self,
+        *,
+        conversation_id: UUID,
+        turn_id: UUID,
+        owner_user_id: str,
+    ) -> ConversationTurnRecord | None:
+        with self._lock:
+            conversation = self._conversations.get(conversation_id)
+            turn = self._turns.get(turn_id)
+            if (
+                conversation is None
+                or conversation.owner_user_id != owner_user_id
+                or turn is None
+                or turn.conversation_id != conversation_id
+            ):
+                return None
+            return turn
 
     def get_turn_by_workflow_thread(
         self,
@@ -1296,6 +1324,27 @@ class SQLiteConversationRepository:
                 (str(conversation_id), limit),
             ).fetchall()
             return [_turn_from_row(row) for row in reversed(rows)]
+        finally:
+            connection.close()
+
+    def get_turn_for_owner(
+        self,
+        *,
+        conversation_id: UUID,
+        turn_id: UUID,
+        owner_user_id: str,
+    ) -> ConversationTurnRecord | None:
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                f"SELECT {TURN_SELECT_COLUMNS} FROM conversation_turns "
+                "WHERE conversation_id = ? AND turn_id = ? "
+                "AND EXISTS (SELECT 1 FROM conversations "
+                "WHERE conversations.conversation_id = conversation_turns.conversation_id "
+                "AND owner_user_id = ?)",
+                (str(conversation_id), str(turn_id), owner_user_id),
+            ).fetchone()
+            return None if row is None else _turn_from_row(row)
         finally:
             connection.close()
 
@@ -2233,6 +2282,24 @@ class PostgresConversationRepository:
                 (conversation_id, limit),
             ).fetchall()
         return [_turn_from_row(row) for row in reversed(rows)]
+
+    def get_turn_for_owner(
+        self,
+        *,
+        conversation_id: UUID,
+        turn_id: UUID,
+        owner_user_id: str,
+    ) -> ConversationTurnRecord | None:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                f"SELECT {TURN_SELECT_COLUMNS} FROM conversation_turns "
+                "WHERE conversation_id = %s AND turn_id = %s "
+                "AND EXISTS (SELECT 1 FROM conversations "
+                "WHERE conversations.conversation_id = conversation_turns.conversation_id "
+                "AND owner_user_id = %s)",
+                (conversation_id, turn_id, owner_user_id),
+            ).fetchone()
+        return None if row is None else _turn_from_row(row)
 
     def get_turn_by_workflow_thread(
         self,
